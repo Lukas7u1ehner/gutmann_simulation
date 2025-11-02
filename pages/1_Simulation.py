@@ -3,8 +3,9 @@ import pandas as pd
 from datetime import date, timedelta
 import sys, os
 
-# (WICHTIG) Dieser sys.path.append MUSS hier bleiben!
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Diese sys.path.append Zeilen SIND FALSCH für die Streamlit Cloud und müssen entfernt werden.
+# Die Cloud führt alles vom Hauptverzeichnis aus, wo 'src' bereits sichtbar ist.
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
 # (ÄNDERUNG) Importiere und wende die Styles aus 'src' an
