@@ -4,7 +4,9 @@ import streamlit as st
 
 # Importiere die Farben aus dem Style-Modul
 try:
-    # (FIX) Der Import muss relativ zum 'src'-Ordner sein (mit einem Punkt).
+    # --- (KORREKTUR) ---
+    # Da plotting.py und style.py im selben Ordner 'src' liegen,
+    # muss der Import relativ sein (mit einem Punkt).
     from .style import (
         GUTMANN_ACCENT_GREEN,
         GUTMANN_LIGHT_TEXT,
