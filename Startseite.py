@@ -5,7 +5,7 @@ import sys, os
 # Python findet den 'src' Ordner automatisch vom Hauptverzeichnis aus.
 
 try:
-    # (ÄNDERUNG) Importiere jetzt aus dem 'src' Paket
+    # KORREKTUR: Muss jetzt explizit aus dem 'src' Paket importieren
     from src.style import (
         apply_gutmann_style,
         GUTMANN_LOGO_URL,
@@ -13,7 +13,9 @@ try:
         GUTMANN_DARK_GREEN,
     )
 except ImportError:
-    st.error("Fehler: 'src/style.py' konnte nicht gefunden werden.")
+    st.error(
+        "Fehler: 'src/style.py' konnte nicht gefunden werden. Stelle sicher, dass die Datei im Hauptverzeichnis liegt."
+    )
 
     # Fallback-Funktionen, damit die App nicht abstürzt
     def apply_gutmann_style():

@@ -22,19 +22,19 @@ except ImportError:
         pass
 
     GUTMANN_LOGO_URL = ""
-    GUTMANN_ACCENT_GREEN = "#B3D4V3"
+    GUTMANN_ACCENT_GREEN = "#B3D463"
     GUTMANN_LIGHT_TEXT = "#D1D1D1"
 
 apply_gutmann_style()
 
 
-# (ÄNDERUNG) Alle Modul-Importe brauchen jetzt das 'src.' Präfix
+# (ÄNDERUNG) Alle Modul-Importe brauchen jetzt das 'src.' Präfix und eine gemeinsame Fehlerbehandlung
 try:
     from src import backend_simulation
     from src import plotting
     from src import portfolio_logic
+    from src import prognose_logic
     from src.catalog import KATALOG
-    from src import prognose_logic # (NEU) Importiere die Prognose-Logik
 except ImportError:
     st.error("Fehler beim Laden der Backend-Module aus dem 'src' Ordner.")
     st.stop()
