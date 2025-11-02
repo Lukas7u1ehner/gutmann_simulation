@@ -3,12 +3,31 @@ import pandas as pd
 from datetime import date, timedelta
 import sys, os
 
-# Diese Zeile MUSS hier sein, damit das Skript im 'pages'-Ordner
-# den 'src'-Ordner im übergeordneten Verzeichnis finden kann.
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# --- DEBUGGING-BLOCK START ---
+# Wir finden jetzt den exakten Fehler.
 
+st.error("DEBUGGING-MODUS AKTIV")
 
-# (ÄNDERUNG) Importiere und wende die Styles aus 'src' an
+# 1. Definiere den Root-Pfad
+# __file__ ist der Pfad zu '1_Simulation.py'
+# os.path.dirname(__file__) ist 'pages'
+# os.path.join(..., "..") ist 'pages/..' -> das Hauptverzeichnis
+root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
+st.write(f"**Debug 1:** Aktuelle Datei (`__file__`): `{__file__}`")
+st.write(f"**Debug 2:** Berechneter Root-Pfad: `{root_path}`")
+
+# 2. Füge den Root-Pfad zum sys.path hinzu (MANDATORY)
+if root_path not in sys.path:
+    sys.path.append(root_path)
+    st.write(f"**Debug 3:** Root-Pfad wurde zum sys.path hinzugefügt.")
+else:
+    st.write(f"**Debug 3:** Root-Pfad war bereits im sys.path.")
+
+st.write(f"**Debug 4:** Aktueller `sys.path`:")
+st.json(sys.path)
+
+# 3. Teste jeden Import einzeln
 try:
     from src.style import (
         apply_gutmann_style,
@@ -16,33 +35,68 @@ try:
         GUTMANN_ACCENT_GREEN,
         GUTMANN_LIGHT_TEXT,
     )
-except ImportError:
-    st.error("Fehler: 'src/style.py' konnte nicht gefunden werden.")
 
-    def apply_gutmann_style():
-        pass
+    st.success("Debug: `src.style` erfolgreich importiert.")
+    apply_gutmann_style()
+except ImportError as e:
+    st.error(f"**FATALER FEHLER beim Import von `src.style`:** {e}")
+    st.write("Mögliche Lösung: Prüfe, ob `src/__init__.py` existiert.")
+    st.stop()
 
-    GUTMANN_LOGO_URL = ""
-    GUTMANN_ACCENT_GREEN = "#B3D463"
-    GUTMANN_LIGHT_TEXT = "#D1D1D1"
-
-apply_gutmann_style()
-
-
-# (ÄNDERUNG) Alle Modul-Importe brauchen jetzt das 'src.' Präfix und eine gemeinsame Fehlerbehandlung
 try:
     from src import backend_simulation
-    from src import plotting
-    from src import portfolio_logic
-    from src import prognose_logic
-    from src.catalog import KATALOG
-except ImportError:
-    st.error("Fehler beim Laden der Backend-Module aus dem 'src' Ordner.")
+
+    st.success("Debug: `src.backend_simulation` erfolgreich importiert.")
+except ImportError as e:
+    st.error(f"**FATALER FEHLER beim Import von `src.backend_simulation`:** {e}")
+    st.write("Mögliche Lösung: Prüfe `src/backend_simulation.py` auf Importfehler.")
     st.stop()
+
+try:
+    from src import plotting
+
+    st.success("Debug: `src.plotting` erfolgreich importiert.")
+except ImportError as e:
+    st.error(f"**FATALER FEHLER beim Import von `src.plotting`:** {e}")
+    st.write(
+        "Mögliche Lösung: Prüfe `src/plotting.py`. Importiert es `style` mit `from .style import ...` (mit Punkt)?"
+    )
+    st.stop()
+
+try:
+    from src import portfolio_logic
+
+    st.success("Debug: `src.portfolio_logic` erfolgreich importiert.")
+except ImportError as e:
+    st.error(f"**FATALER FEHLER beim Import von `src.portfolio_logic`:** {e}")
+    st.write(
+        "Mögliche Lösung: Prüfe `src/portfolio_logic.py`. Importiert es `backend_simulation` mit `from .backend_simulation import ...` (mit Punkt)?"
+    )
+    st.stop()
+
+try:
+    from src import prognose_logic
+
+    st.success("Debug: `src.prognose_logic` erfolgreich importiert.")
+except ImportError as e:
+    st.error(f"**FATALER FEHLER beim Import von `src.prognose_logic`:** {e}")
+    st.write("Mögliche Lösung: Prüfe `src/prognose_logic.py` auf Importfehler.")
+    st.stop()
+
+try:
+    from src.catalog import KATALOG
+
+    st.success("Debug: `src.catalog` erfolgreich importiert.")
+except ImportError as e:
+    st.error(f"**FATALER FEHLER beim Import von `src.catalog`:** {e}")
+    st.write("Mögliche Lösung: Prüfe `src/catalog.py`.")
+    st.stop()
+
+st.success("--- DEBUGGING ABGESCHLOSSEN: Alle Module geladen. ---")
+# --- DEBUGGING-BLOCK ENDE ---
 
 
 st.set_page_config(page_title="Simulation | Gutmann", page_icon="📈", layout="wide")
-
 
 # --- (UPDATE) Logo im Hauptbereich (Zentriert & Größer) ---
 st.markdown(
