@@ -3,13 +3,9 @@ import streamlit as st
 from datetime import date
 import numpy as np
 
-# (ÄNDERUNG) Importiere die Logik für EIN Asset aus 'src'
-# Da beide Dateien im 'src' Ordner liegen, ist dies ein relativer Import
-try:
-    from src import backend_simulation
-except ImportError:
-    # Fallback, falls direkt ausgeführt
-    import backend_simulation
+# Importiere die Logik für EIN Asset
+# (FIX) Import muss relativ sein (mit Punkt)
+from . import backend_simulation
 
 
 @st.cache_data
