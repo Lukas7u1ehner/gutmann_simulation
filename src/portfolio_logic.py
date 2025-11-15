@@ -3,30 +3,57 @@ import streamlit as st
 from datetime import date
 import numpy as np
 
-# Importiere die Logik für EIN Asset
-# (FIX) Import muss relativ sein (mit Punkt)
 from . import backend_simulation
+
+def _calculate_annualized_return(sim_df: pd.DataFrame, num_years: float) -> float:
+    """Berechnet die annualisierte Rendite (vereinfacht als ROI p.a.)"""
+    if sim_df.empty or num_years == 0:
+        return 0.0
+        
+    end_value = sim_df['Portfolio (nominal)'].iloc[-1]
+    total_investment = sim_df['Einzahlungen (brutto)'].iloc[-1]
+    
+    if total_investment == 0:
+        # Fall: Nur Einmalerlag am Starttag, der nicht in 'Einzahlungen (brutto)' auftaucht
+        # ODER es wurde wirklich nichts investiert
+        if end_value > 0:
+            # Versuchen, aus der ersten Zeile zu schätzen
+            first_day_investment = sim_df['Portfolio (nominal)'].iloc[0]
+            if first_day_investment > 0:
+                return ((end_value / first_day_investment) ** (1 / num_years)) - 1
+        return 0.0
+
+    if end_value <= 0 or total_investment <= 0:
+        return -1.0 # Negativer Verlust
+
+    # Vereinfachte Annahme: (Endwert / Gesamteinzahlung) annualisiert
+    # Dies ist eine Annäherung (ROI p.a.), nicht die exakte IRR.
+    try:
+        return ((end_value / total_investment) ** (1 / num_years)) - 1
+    except Exception:
+        return 0.0 # Fallback bei mathematischen Fehlern (z.B. negative Wurzel)
 
 
 @st.cache_data
 def run_portfolio_simulation(
-    assets: list[dict],  # Eine Liste von Asset-Wörterbüchern
+    assets: list[dict],
     start_date: date,
     end_date: date,
     inflation_rate_pa: float,
     ausgabeaufschlag_pct: float,
     managementgebuehr_pa_pct: float,
     depotgebuehr_pa_eur: float,
-) -> pd.DataFrame | None:
-    """
-    Orchestriert die Simulation für ein ganzes Portfolio von Assets.
-    """
-
+) -> tuple[pd.DataFrame | None, dict, dict]:
+    
     individual_simulations = []
+    historical_returns_pa = {}
+    individual_final_values = {}
+    
+    num_years = (end_date - start_date).days / 365.25
 
-    # --- 1. & 2. Einzelsimulationen durchführen ---
     for asset in assets:
         isin = asset.get("ISIN / Ticker")
+        name = asset.get("Name") or isin
         lump_sum = asset.get("Einmalerlag (€)", 0)
         periodic = asset.get("Sparbetrag (€)", 0)
         interval = asset.get("Spar-Intervall", "monatlich")
@@ -53,17 +80,27 @@ def run_portfolio_simulation(
             ausgabeaufschlag_pct=ausgabeaufschlag_pct,
             managementgebuehr_pa_pct=managementgebuehr_pa_pct,
         )
+        
+        if sim_df.empty:
+            continue
+            
         individual_simulations.append(sim_df)
+        
+        # Berechne p.a. Rendite für dieses Asset
+        return_pa_pct = _calculate_annualized_return(sim_df, num_years) * 100
+        historical_returns_pa[name] = return_pa_pct
+        
+        # Speichere den finalen Wert
+        individual_final_values[name] = sim_df['Portfolio (nominal)'].iloc[-1]
 
-    # --- 3. Aggregation ---
+
     if not individual_simulations:
         st.warning("Keine gültigen Assets im Portfolio für die Simulation.")
-        return None
+        return None, {}, {}
 
     portfolio_df = pd.concat(individual_simulations)
     final_portfolio = portfolio_df.groupby(portfolio_df.index).sum()
 
-    # --- 4. (FIX) Globale Depotgebühr korrekt anwenden ---
     if depotgebuehr_pa_eur > 0:
         final_portfolio["Depotgebuehr_Pkt"] = 0.0
         yearly_fee_dates = final_portfolio.resample("YS").first().index
@@ -89,7 +126,6 @@ def run_portfolio_simulation(
             columns=["Depotgebuehr_Pkt", "Kumulierte_Depotgebuehr"]
         )
 
-    # --- 5. Finale Inflationsberechnung (auf dem finalen nominalen Wert) ---
     daily_inflation_factor = (1.0 + (inflation_rate_pa / 100.0)) ** (1 / 365.0)
     inflation_series = pd.Series(
         daily_inflation_factor, index=final_portfolio.index
@@ -99,4 +135,4 @@ def run_portfolio_simulation(
         final_portfolio["Portfolio (nominal)"] / inflation_series
     )
 
-    return final_portfolio
+    return final_portfolio, historical_returns_pa, individual_final_values

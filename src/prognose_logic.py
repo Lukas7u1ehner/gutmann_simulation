@@ -1,10 +1,9 @@
 import pandas as pd
 import numpy as np
-from datetime import timedelta
+from datetime import timedelta, date
 
 @staticmethod
 def _calculate_total_periodic_investment(assets: list[dict], interval: str) -> float:
-    """Berechnet die Summe aller Sparbeträge für ein bestimmtes Intervall."""
     total = 0
     for asset in assets:
         if asset.get('Spar-Intervall') == interval:
@@ -13,52 +12,48 @@ def _calculate_total_periodic_investment(assets: list[dict], interval: str) -> f
 
 @staticmethod
 def _get_resample_code(interval: str) -> str:
-    """Gibt den pandas Resample-Code für ein Intervall zurück."""
     if interval == "monatlich":
         return "MS"
     elif interval == "vierteljährlich":
         return "QS"
     elif interval == "jährlich":
         return "YS"
-    return "MS" # Fallback
+    return "MS"
 
 def run_forecast(
-    historische_daten: pd.DataFrame,
+    start_values: dict,
     assets: list[dict],
     prognose_jahre: int,
     sparplan_fortfuehren: bool,
     kosten_management_pa_pct: float,
     kosten_depot_pa_eur: float,
     inflation_rate_pa: float,
-    ausgabeaufschlag_pct: float
+    ausgabeaufschlag_pct: float,
+    expected_asset_returns_pa: dict[str, float],
+    asset_final_values: dict[str, float]
 ) -> pd.DataFrame | None:
-    """
-    Erstellt eine Prognose basierend auf der historischen Entwicklung.
-    """
+    
     if prognose_jahre <= 0:
         return None
 
-    # --- 1. Historische Rendite berechnen (Geometrischer Mittelwert) ---
-    hist_nominal = historische_daten['Portfolio (nominal)']
+    # --- 1. Gewichtete p.a. Rendite basierend auf User-Annahmen berechnen ---
+    total_portfolio_value = sum(asset_final_values.values())
+    weighted_avg_return_pa = 0.0
     
-    # Filtern, um 0-Werte zu vermeiden, die Logarithmus-Fehler verursachen
-    hist_nominal_filtered = hist_nominal[hist_nominal > 0]
+    if total_portfolio_value > 0:
+        for asset_name, final_value in asset_final_values.items():
+            weight = final_value / total_portfolio_value
+            # Hole Annahme, falle zurück auf 0 wenn nicht im dict
+            asset_return_assumption = expected_asset_returns_pa.get(asset_name, 0.0)
+            weighted_avg_return_pa += weight * asset_return_assumption
     
-    if hist_nominal_filtered.empty:
-        # Fallback, falls das Portfolio 0 wert ist
-        avg_daily_log_return = 0.0
-    else:
-        log_returns = np.log(hist_nominal_filtered / hist_nominal_filtered.shift(1))
-        avg_daily_log_return = log_returns.replace([np.inf, -np.inf], np.nan).mean()
-
-    if pd.isna(avg_daily_log_return):
-        avg_daily_log_return = 0.0
+    daily_return_factor = (1.0 + (weighted_avg_return_pa / 100.0)) ** (1 / 365.25)
 
     # --- 2. Startwerte & Zeitrahmen für Prognose ---
-    letzter_tag_hist = historische_daten.index[-1]
-    letzter_wert_nominal = historische_daten['Portfolio (nominal)'].iloc[-1]
-    letzter_wert_real = historische_daten['Portfolio (real)'].iloc[-1]
-    letzte_einzahlung = historische_daten['Einzahlungen (brutto)'].iloc[-1]
+    letzter_tag_hist = start_values['letzter_tag']
+    letzter_wert_nominal = start_values['nominal']
+    letzter_wert_real_basis = start_values['real'] # Basis für Inflationsfaktor
+    letzte_einzahlung = start_values['einzahlung']
 
     start_datum_prognose = letzter_tag_hist + timedelta(days=1)
     end_datum_prognose = start_datum_prognose + timedelta(days=int(prognose_jahre * 365.25))
@@ -75,10 +70,15 @@ def run_forecast(
     daily_mgmt_fee_factor = (1.0 - (kosten_management_pa_pct / 100.0)) ** (1 / 365.25)
     cost_factor_sparrate = (1.0 - (ausgabeaufschlag_pct / 100.0))
     
-    # (NEU) Kumulativen Inflations-Faktor für reale Berechnungen erstellen
+    # Kumulativen Inflations-Faktor erstellen
     prognose_df['Inflation_Factor'] = pd.Series(daily_inflation_factor, index=prognose_df.index).cumprod()
-    # Der erste Tag der Prognose basiert auf der Inflation *bis zu diesem Tag*
-    prognose_df['Inflation_Factor'] *= (historische_daten.iloc[-1]['Portfolio (nominal)'] / historische_daten.iloc[-1]['Portfolio (real)'])
+    
+    # Inflationsfaktor-Basis vom letzten historischen Tag holen
+    inflation_basis = 1.0
+    if letzter_wert_real_basis > 0:
+        inflation_basis = letzter_wert_nominal / letzter_wert_real_basis
+        
+    prognose_df['Inflation_Factor'] *= inflation_basis
 
 
     # --- 4. Zukünftige Sparpläne vorbereiten ---
@@ -96,25 +96,20 @@ def run_forecast(
                 prognose_df.loc[spartage_im_index, 'Sparrate_Einzahlung'] = total_periodic
                 prognose_df.loc[spartage_im_index, 'Sparrate_Netto'] = total_periodic * cost_factor_sparrate
 
-    # --- 5. Tägliche Prognose-Schleife (KORRIGIERT) ---
-    
-    # (FIX) Listen für performantes Speichern erstellen
+    # --- 5. Tägliche Prognose-Schleife ---
     nominal_values = []
     real_values = []
     einzahlung_values = []
 
-    # Initialwerte setzen
     current_nominal = letzter_wert_nominal
-    current_real = letzter_wert_real
     current_einzahlung = letzte_einzahlung
     
-    # Depotgebühr-Stichtage finden
     depotgebuehr_tage = prognose_df.resample('YS').first().index.intersection(prognose_df.index)
 
     for i, (tag, row) in enumerate(prognose_df.iterrows()):
         
-        # 1. Wertsteigerung (basierend auf Historie)
-        current_nominal *= np.exp(avg_daily_log_return)
+        # 1. Wertsteigerung (basierend auf User-Annahmen)
+        current_nominal *= daily_return_factor
         
         # 2. Sparplan-Einzahlung (Netto)
         current_nominal += row['Sparrate_Netto']
@@ -127,23 +122,18 @@ def run_forecast(
         if tag in depotgebuehr_tage:
             current_nominal -= kosten_depot_pa_eur
             
-        # 4. Wert darf nicht negativ werden
         current_nominal = max(0, current_nominal)
         
         # 5. Reale & Brutto-Werte berechnen
         current_einzahlung += row['Sparrate_Einzahlung']
-        # (FIX) Korrekte Real-Berechnung
         current_real = current_nominal / row['Inflation_Factor']
         
-        # 6. Werte in Listen speichern
         nominal_values.append(current_nominal)
         real_values.append(current_real)
         einzahlung_values.append(current_einzahlung)
 
-    # (FIX) Listen nach der Schleife den Spalten zuweisen
     prognose_df['Portfolio (nominal)'] = nominal_values
     prognose_df['Portfolio (real)'] = real_values
     prognose_df['Einzahlungen (brutto)'] = einzahlung_values
 
     return prognose_df
-

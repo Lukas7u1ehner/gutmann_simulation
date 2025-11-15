@@ -22,11 +22,12 @@ try:
 
 except ImportError as e:
     st.error(
-        f"**FATALER FEHLER beim Import von `src`:** {e}. Stelle sicher, dass der 'src'-Ordner im selben Verzeichnis wie App.py liegt."
+        f"**FATALER FEHLER beim Import von `src`:** {e}. Stelle sicher, dass der 'src'-Ordner im selben Verzeichnis wie Startseite.py liegt."
     )
     st.stop()
 
 
+# --- SESSION STATE INITIALISIERUNG (ERWEITERT) ---
 if "active_tab" not in st.session_state:
     st.session_state.active_tab = "🏠 Startseite"
 if "katalog_auswahl" not in st.session_state:
@@ -51,36 +52,50 @@ if "assets" not in st.session_state:
         },
     ]
 
+# Kosten & Inflation
 if "cost_ausgabe" not in st.session_state:
     st.session_state.cost_ausgabe = 2.0
 if "cost_management" not in st.session_state:
     st.session_state.cost_management = 2.0
 if "cost_depot" not in st.session_state:
     st.session_state.cost_depot = 50.0
+if "inflation_slider" not in st.session_state:
+    st.session_state.inflation_slider = 3.0
+
+# Prognose-Parameter
 if "prognose_jahre" not in st.session_state:
     st.session_state.prognose_jahre = 0
 if "prognose_sparplan" not in st.session_state:
     st.session_state.prognose_sparplan = True
+
+# Daten-Container
 if "simulations_daten" not in st.session_state:
     st.session_state.simulations_daten = None
 if "prognose_daten" not in st.session_state:
     st.session_state.prognose_daten = None
 
-if "inflation_slider" not in st.session_state:
-    st.session_state.inflation_slider = 3.0
+# NEUE DATEN-CONTAINER (für Feedback)
+if "historical_returns_pa" not in st.session_state:
+    st.session_state.historical_returns_pa = {}
+if "asset_final_values" not in st.session_state:
+    st.session_state.asset_final_values = {}
+if "prognosis_assumptions_pa" not in st.session_state:
+    st.session_state.prognosis_assumptions_pa = {}
+# --- ENDE SESSION STATE ---
 
 
-def go_to_simulation():
-    st.session_state.active_tab = "⚙️ Simulation (Setup)"
+def go_to_setup():
+    st.session_state.active_tab = "⚙️ Setup & Historie"
 
 def go_to_prognose():
-    st.session_state.active_tab = "📈 Prognose & Ergebnisse"
+    st.session_state.active_tab = "📈 Zukunftsprognose"
 
 
-tabs_options = ["🏠 Startseite", "⚙️ Simulation (Setup)"]
+# --- TAB LOGIK ---
+tabs_options = ["🏠 Startseite", "⚙️ Setup & Historie"]
 
 if st.session_state.simulations_daten is not None:
-    tabs_options.append("📈 Prognose & Ergebnisse")
+    tabs_options.append("📈 Zukunftsprognose")
 
 st.radio(
     " ",
@@ -92,6 +107,7 @@ st.radio(
 st.divider()
 
 
+# --- TAB 1: STARTSEITE ---
 if st.session_state.active_tab == "🏠 Startseite":
     
     st.markdown(
@@ -112,7 +128,7 @@ if st.session_state.active_tab == "🏠 Startseite":
     st.markdown("### Starten Sie Ihre persönliche Simulation")
     st.button(
         "📈 Zur Simulation starten", 
-        on_click=go_to_simulation,
+        on_click=go_to_setup,
         use_container_width=True,
         type="primary"
     )
@@ -150,7 +166,8 @@ if st.session_state.active_tab == "🏠 Startseite":
         )
 
 
-elif st.session_state.active_tab == "⚙️ Simulation (Setup)":
+# --- TAB 2: SETUP & HISTORIE ---
+elif st.session_state.active_tab == "⚙️ Setup & Historie":
     
     def handle_add_click():
         name_to_add = ""
@@ -170,9 +187,7 @@ elif st.session_state.active_tab == "⚙️ Simulation (Setup)":
                 if is_valid:
                     name_to_add = message_or_name
                 else:
-                    st.toast(
-                        f"Ticker/ISIN '{isin_to_add}' nicht gefunden.", icon="❌"
-                    )
+                    st.toast(f"Ticker/ISIN '{isin_to_add}' nicht gefunden.", icon="❌")
                     st.warning(f"Technischer Grund: {message_or_name}")
         
         if is_valid and isin_to_add:
@@ -188,7 +203,7 @@ elif st.session_state.active_tab == "⚙️ Simulation (Setup)":
             st.toast(f"Titel '{name_to_add}' hinzugefügt!", icon="✅")
             st.session_state.katalog_auswahl = "Bitte wählen..."
             st.session_state.manuelle_isin = ""
-            st.session_state.active_tab = "⚙️ Simulation (Setup)"
+            st.session_state.active_tab = "⚙️ Setup & Historie"
         elif not is_valid and not st.session_state.manuelle_isin:
             st.toast("Bitte Titel auswählen oder ISIN eingeben.", icon="⚠️")
 
@@ -212,25 +227,9 @@ elif st.session_state.active_tab == "⚙️ Simulation (Setup)":
     with col4:
         st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
         with st.popover("💸 Kosten", use_container_width=True):
-            
-            st.number_input(
-                "Ausgabeaufschlag (%)", 0.0, 10.0, 
-                value=st.session_state.cost_ausgabe,
-                key="cost_ausgabe", 
-                step=0.1
-            )
-            st.number_input(
-                "Managementgebühr (% p.a.)", 0.0, 10.0, 
-                value=st.session_state.cost_management,
-                key="cost_management", 
-                step=0.01
-            )
-            st.number_input(
-                "Depotgebühr (€ p.a.)", 0.0, 
-                value=st.session_state.cost_depot,
-                key="cost_depot", 
-                step=1.0
-            )
+            st.number_input("Ausgabeaufschlag (%)", 0.0, 10.0, value=st.session_state.cost_ausgabe, key="cost_ausgabe", step=0.1)
+            st.number_input("Managementgebühr (% p.a.)", 0.0, 10.0, value=st.session_state.cost_management, key="cost_management", step=0.01)
+            st.number_input("Depotgebühr (€ p.a.)", 0.0, value=st.session_state.cost_depot, key="cost_depot", step=1.0)
     
     st.divider()
 
@@ -265,7 +264,7 @@ elif st.session_state.active_tab == "⚙️ Simulation (Setup)":
     
     st.divider()
 
-    st.subheader("🚀 Schritt 3: Simulation starten")
+    st.subheader("🚀 Schritt 3: Historische Simulation starten")
     run_button = st.button(
         "Historische Simulation berechnen", 
         type="primary",
@@ -291,10 +290,13 @@ elif st.session_state.active_tab == "⚙️ Simulation (Setup)":
         
         if is_valid:
             st.session_state.simulations_daten = None 
-            st.session_state.prognose_daten = None 
+            st.session_state.prognose_daten = None
+            st.session_state.historical_returns_pa = {}
+            st.session_state.asset_final_values = {}
+            st.session_state.prognosis_assumptions_pa = {}
             
             with st.spinner("Lade Daten und berechne Portfolio-Simulation..."):
-                st.session_state.simulations_daten = portfolio_logic.run_portfolio_simulation(
+                sim_data, hist_returns, final_values = portfolio_logic.run_portfolio_simulation(
                     assets=assets_to_simulate,
                     start_date=start_datum,
                     end_date=end_datum,
@@ -304,10 +306,14 @@ elif st.session_state.active_tab == "⚙️ Simulation (Setup)":
                     depotgebuehr_pa_eur=st.session_state.cost_depot,
                 )
             
-            if st.session_state.simulations_daten is None:
+            if sim_data is None:
                 st.error("Simulation konnte nicht durchgeführt werden. Bitte Eingaben prüfen.")
             else:
                 st.toast("Historische Simulation erfolgreich!", icon="🎉")
+                st.session_state.simulations_daten = sim_data
+                st.session_state.historical_returns_pa = hist_returns
+                st.session_state.asset_final_values = final_values
+                st.session_state.prognosis_assumptions_pa = hist_returns.copy()
     
     
     if st.session_state.simulations_daten is not None:
@@ -320,15 +326,13 @@ elif st.session_state.active_tab == "⚙️ Simulation (Setup)":
         chart_col, kpi_col = st.columns([3, 1])
         
         with chart_col:
-            fig = plotting.create_simulation_chart(simulations_daten, None) 
+            fig = plotting.create_simulation_chart(simulations_daten, None, title="Historische Portfolio-Entwicklung") 
             st.plotly_chart(fig, use_container_width=True)
         
         with kpi_col:
             st.markdown('<div style="margin-top: 25px;"></div>', unsafe_allow_html=True)
             try:
-                daten_fuer_kpi = simulations_daten
-                kpi_label_suffix = " (Historisch)"
-                last_row = daten_fuer_kpi.iloc[-1]
+                last_row = simulations_daten.iloc[-1]
                 end_value_nominal = last_row["Portfolio (nominal)"]
                 end_value_real = last_row["Portfolio (real)"]
                 total_investment = last_row["Einzahlungen (brutto)"]
@@ -340,16 +344,31 @@ elif st.session_state.active_tab == "⚙️ Simulation (Setup)":
                    rendite_real_prozent = 0.0
                    rendite_nominal_prozent = 0.0
 
-                st.metric(f"Gesamteinzahlung (brutto){kpi_label_suffix}", f"€ {total_investment:,.2f}")
-                st.metric(f"Endkapital (nominal){kpi_label_suffix}", f"€ {end_value_nominal:,.2f}")
-                st.metric(f"Endkapital (real){kpi_label_suffix}", f"€ {end_value_real:,.2f}")
-                st.metric(f"Rendite (nominal){kpi_label_suffix}", f"{rendite_nominal_prozent:,.2f} %")
-                st.metric(f"Rendite (real){kpi_label_suffix}", f"{rendite_real_prozent:,.2f} %")
+                st.metric("Gesamteinzahlung (brutto)", f"€ {total_investment:,.2f}")
+                st.metric("Endkapital (nominal)", f"€ {end_value_nominal:,.2f}")
+                st.metric("Endkapital (real)", f"€ {end_value_real:,.2f}")
+                st.metric("Rendite (nominal)", f"{rendite_nominal_prozent:,.2f} %")
+                st.metric("Rendite (real)", f"{rendite_real_prozent:,.2f} %")
             except Exception as e:
                 st.error(f"Fehler bei KPI-Berechnung: {e}")
 
+        # --- NEU: ANZEIGE DER P.A. RENDITEN PRO TITEL ---
+        st.divider()
+        st.subheader("📈 Berechnete Rendite p.a. (Historisch)")
+        hist_returns = st.session_state.historical_returns_pa
+        
+        if not hist_returns:
+            st.info("Keine historischen Renditen berechnet.")
+        else:
+            num_cols = len(hist_returns)
+            cols = st.columns(num_cols)
+            for i, (name, rendite_pa) in enumerate(hist_returns.items()):
+                with cols[i]:
+                    st.metric(f"{name}", f"{rendite_pa:,.2f} % p.a.")
+        
+        st.divider()
         st.button(
-            "🔮 Zur Prognose wechseln", 
+            "🔮 Zur Zukunftsprognose wechseln", 
             on_click=go_to_prognose, 
             use_container_width=True
         )
@@ -358,54 +377,97 @@ elif st.session_state.active_tab == "⚙️ Simulation (Setup)":
             st.dataframe(simulations_daten)
 
 
-elif st.session_state.active_tab == "📈 Prognose & Ergebnisse":
+# --- TAB 3: ZUKUNFTSPROGNOSE ---
+elif st.session_state.active_tab == "📈 Zukunftsprognose":
     
     simulations_daten = st.session_state.simulations_daten
 
     if simulations_daten is None:
-        st.warning("Bitte führe zuerst eine Simulation im Tab 'Simulation (Setup)' durch.")
+        st.warning("Bitte führe zuerst eine Simulation im Tab 'Setup & Historie' durch.")
         st.stop()
 
-
-    st.subheader("🔮 Prognose-Parameter")
-    st.caption("Ändere die Parameter, um die Prognose im Chart live zu aktualisieren.")
     
+    # --- NEUE CALLBACK-LOGIK ---
     def update_prognose():
-        sim_data = st.session_state.simulations_daten 
-        if sim_data is None:
-            st.session_state.prognose_daten = None
-            return
+        
+        # 1. Lese Annahmen aus den Widgets (die im session_state gespeichert sind)
+        assumptions_from_widgets = {}
+        for asset_name in st.session_state.prognosis_assumptions_pa.keys():
+            widget_key = f"assumption_{asset_name}"
+            assumptions_from_widgets[asset_name] = st.session_state.get(widget_key, 0.0)
+        
+        # 2. Aktualisiere den Haupt-Assumptions-State (für den Fall, dass ein Widget geändert wurde)
+        st.session_state.prognosis_assumptions_pa = assumptions_from_widgets
+        
+        # 3. Hole die Startwerte
+        last_row = simulations_daten.iloc[-1]
+        start_values = {
+            "letzter_tag": simulations_daten.index[-1],
+            "nominal": last_row["Portfolio (nominal)"],
+            "real": last_row["Portfolio (real)"],
+            "einzahlung": last_row["Einzahlungen (brutto)"]
+        }
 
-        if st.session_state.prognose_jahre > 0:
-            assets_fuer_prognose = [asset for asset in st.session_state.assets if asset.get("ISIN / Ticker")]
-            
-            st.session_state.prognose_daten = prognose_logic.run_forecast(
-                historische_daten=sim_data,
-                assets=assets_fuer_prognose,
-                prognose_jahre=st.session_state.prognose_jahre,
-                sparplan_fortfuehren=st.session_state.prognose_sparplan,
-                kosten_management_pa_pct=st.session_state.cost_management,
-                kosten_depot_pa_eur=st.session_state.cost_depot,
-                inflation_rate_pa=st.session_state.inflation_slider, 
-                ausgabeaufschlag_pct=st.session_state.cost_ausgabe
-            )
-        else:
-             st.session_state.prognose_daten = None
+        # 4. Führe die Prognose mit den neuen Annahmen aus
+        st.session_state.prognose_daten = prognose_logic.run_forecast(
+            start_values=start_values,
+            assets=st.session_state.assets,
+            prognose_jahre=st.session_state.prognose_jahre,
+            sparplan_fortfuehren=st.session_state.prognose_sparplan,
+            kosten_management_pa_pct=st.session_state.cost_management,
+            kosten_depot_pa_eur=st.session_state.cost_depot,
+            inflation_rate_pa=st.session_state.inflation_slider, 
+            ausgabeaufschlag_pct=st.session_state.cost_ausgabe,
+            expected_asset_returns_pa=assumptions_from_widgets,
+            asset_final_values=st.session_state.asset_final_values
+        )
 
+    # --- UI FÜR PROGNOSE-PARAMETER ---
+    st.subheader("🔮 Prognose-Parameter (Global)")
     prog_col1, prog_col2 = st.columns(2)
     with prog_col1:
         st.number_input(
-            "Prognose-Horizont (Jahre)", 0, 50, key="prognose_jahre", step=1,
+            "Prognose-Horizont (Jahre)", 0, 50, 
+            key="prognose_jahre", 
+            step=1,
             help="Wie viele Jahre soll in die Zukunft prognostiziert werden? (0 = keine Prognose).",
             on_change=update_prognose
         )
     with prog_col2:
         st.checkbox(
-            "Sparplan in Prognose fortführen", key="prognose_sparplan",
-            help="Sollen die Sparpläne (siehe Tab 'Simulation (Setup)') in der Zukunft weiterlaufen?",
+            "Sparplan in Prognose fortführen", 
+            key="prognose_sparplan",
+            help="Sollen die Sparpläne (siehe Tab 'Setup & Historie') in der Zukunft weiterlaufen?",
             on_change=update_prognose
         )
+    st.caption("Globale Kosten & Inflation werden aus dem 'Setup & Historie'-Tab übernommen.")
+    st.divider()
 
+    # --- NEU: UI FÜR ASSET-ANNAHMEN ---
+    st.subheader("📈 Erwartete Rendite p.a. (Ihre Annahmen)")
+    
+    assumptions = st.session_state.prognosis_assumptions_pa
+    
+    if not assumptions:
+        st.warning("Keine Assets für Annahmen gefunden. Bitte Historie berechnen.")
+    else:
+        num_cols = len(assumptions)
+        cols = st.columns(num_cols)
+        
+        for i, (name, default_rendite_pa) in enumerate(assumptions.items()):
+            with cols[i]:
+                st.number_input(
+                    f"{name} (% p.a.)",
+                    min_value=-20.0,
+                    max_value=50.0,
+                    value=default_rendite_pa,
+                    step=0.5,
+                    key=f"assumption_{name}", # WICHTIGER KEY
+                    on_change=update_prognose, # Löst Neuberechnung aus
+                    help=f"Ihre Annahme für die zukünftige Rendite von {name}."
+                )
+
+    # --- Initialer Check, ob Prognose berechnet werden muss ---
     if st.session_state.prognose_jahre > 0 and st.session_state.prognose_daten is None:
         update_prognose()
 
@@ -413,9 +475,14 @@ elif st.session_state.active_tab == "📈 Prognose & Ergebnisse":
     
     st.divider()
 
-    st.subheader("📊 Ergebnisse: Simulation + Prognose")
+    # --- ANZEIGE DER GRAFIK ---
+    st.subheader("📊 Ergebnisse: Historie + Zukunftsprognose")
     
-    fig = plotting.create_simulation_chart(simulations_daten, prognose_daten)
+    fig = plotting.create_simulation_chart(
+        simulations_daten, 
+        prognose_daten, 
+        title="Portfolio-Entwicklung (Historie & Prognose)"
+    )
     st.plotly_chart(fig, use_container_width=True)
 
     with st.expander("🔍 Zeige aggregierte historische Ergebnisdaten (Täglich)"):
