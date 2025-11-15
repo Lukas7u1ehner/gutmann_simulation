@@ -50,19 +50,22 @@ def load_data(isin: str, start_date: date, end_date: date) -> pd.DataFrame | Non
 def validate_and_get_info(ticker: str) -> (bool, str | None):
     """
     Prüft, ob ein Ticker gültig ist und holt den Namen.
-    Gibt (True, "Ticker Name") oder (False, None) zurück.
+    (NEU) Gibt (True, "Ticker Name") oder (False, "Genaue Fehlermeldung") zurück.
     """
     if not ticker:
-        return (False, None)
+        return (False, "Kein Ticker/ISIN angegeben.")
     try:
         ticker_obj = yf.Ticker(ticker)
+        
+        # (DEBUG) Versuche, .info abzurufen. Dies schlägt bei ISINs oft fehl.
         info = ticker_obj.info
 
-        # 'info' kann für ungültige Ticker leer sein oder 'regularMarketPrice' fehlt
-        # Wir prüfen stattdessen, ob history() funktioniert, das ist zuverlässiger.
-        if ticker_obj.history(period="1d").empty:
+        # (DEBUG) Prüfe, ob .history() leer ist.
+        history_data = ticker_obj.history(period="1d")
+        
+        if history_data.empty:
             print(f"Validierung fehlgeschlagen: Keine Daten für {ticker}")
-            return (False, None)
+            return (False, f"yfinance fand keine 'history'-Daten für '{ticker}'.")
 
         # Versuche, den Namen zu bekommen
         name = info.get("longName", info.get("shortName"))
@@ -75,19 +78,10 @@ def validate_and_get_info(ticker: str) -> (bool, str | None):
         return (True, name)
 
     except Exception as e:
-        # yfinance wirft manchmal Fehler für gültige Ticker, die keine .info haben
-        # Solange history() geht, ist es ok.
-        try:
-            if not yf.Ticker(ticker).history(period="1d").empty:
-                print(
-                    f"Validierung erfolgreich für {ticker}, aber .info fehlt. Verwende Ticker als Name."
-                )
-                return (True, ticker)  # Ticker ist gültig, aber kein Name
-        except Exception:
-            pass  # Innerer Check fehlgeschlagen
-
+        # (DEBUG) Gib die genaue yfinance-Exception zurück
         print(f"Validierungs-Exception für {ticker}: {e}")
-        return (False, None)
+        # Gib die Fehlermeldung als String zurück, damit sie im Frontend angezeigt werden kann
+        return (False, f"yfinance Exception: {e}")
 
 
 # Caching für die Berechnungs-Funktion

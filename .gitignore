@@ -79,3 +79,6 @@ MacOS / Windows specific
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+
+package-lock.json

@@ -1,0 +1,426 @@
+import streamlit as st
+import pandas as pd
+from datetime import date, timedelta
+import sys, os
+
+st.set_page_config(page_title="Simulation | Gutmann", page_icon="📈", layout="wide")
+
+try:
+    from src.style import (
+        apply_gutmann_style,
+        GUTMANN_LOGO_URL,
+        GUTMANN_ACCENT_GREEN,
+        GUTMANN_LIGHT_TEXT,
+    )
+    from src import backend_simulation
+    from src import plotting
+    from src import portfolio_logic
+    from src import prognose_logic
+    from src.catalog import KATALOG
+
+    apply_gutmann_style()
+
+except ImportError as e:
+    st.error(
+        f"**FATALER FEHLER beim Import von `src`:** {e}. Stelle sicher, dass der 'src'-Ordner im selben Verzeichnis wie App.py liegt."
+    )
+    st.stop()
+
+
+if "active_tab" not in st.session_state:
+    st.session_state.active_tab = "🏠 Startseite"
+if "katalog_auswahl" not in st.session_state:
+    st.session_state.katalog_auswahl = "Bitte wählen..."
+if "manuelle_isin" not in st.session_state:
+    st.session_state.manuelle_isin = ""
+if "assets" not in st.session_state:
+    st.session_state.assets = [
+        {
+            "Name": "S&P 500 ETF",
+            "ISIN / Ticker": "IE00B5BMR087",
+            "Einmalerlag (€)": 1000.0,
+            "Sparbetrag (€)": 100.0,
+            "Spar-Intervall": "monatlich",
+        },
+        {
+            "Name": "Apple Aktie",
+            "ISIN / Ticker": "US0378331005",
+            "Einmalerlag (€)": 500.0,
+            "Sparbetrag (€)": 50.0,
+            "Spar-Intervall": "monatlich",
+        },
+    ]
+
+if "cost_ausgabe" not in st.session_state:
+    st.session_state.cost_ausgabe = 2.0
+if "cost_management" not in st.session_state:
+    st.session_state.cost_management = 2.0
+if "cost_depot" not in st.session_state:
+    st.session_state.cost_depot = 50.0
+if "prognose_jahre" not in st.session_state:
+    st.session_state.prognose_jahre = 0
+if "prognose_sparplan" not in st.session_state:
+    st.session_state.prognose_sparplan = True
+if "simulations_daten" not in st.session_state:
+    st.session_state.simulations_daten = None
+if "prognose_daten" not in st.session_state:
+    st.session_state.prognose_daten = None
+
+if "inflation_slider" not in st.session_state:
+    st.session_state.inflation_slider = 3.0
+
+
+def go_to_simulation():
+    st.session_state.active_tab = "⚙️ Simulation (Setup)"
+
+def go_to_prognose():
+    st.session_state.active_tab = "📈 Prognose & Ergebnisse"
+
+
+tabs_options = ["🏠 Startseite", "⚙️ Simulation (Setup)"]
+
+if st.session_state.simulations_daten is not None:
+    tabs_options.append("📈 Prognose & Ergebnisse")
+
+st.radio(
+    " ",
+    options=tabs_options,
+    key="active_tab",
+    horizontal=True,
+)
+
+st.divider()
+
+
+if st.session_state.active_tab == "🏠 Startseite":
+    
+    st.markdown(
+        f"""
+        <div style="display: flex; align-items: center; justify-content: center; margin-top: 20px; margin-bottom: 30px;">
+            <img src="{GUTMANN_LOGO_URL}" alt="Bank Gutmann Logo" style="width: 350px;">
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.title("Willkommen zur Bank Gutmann Wertpapier-Simulation")
+    st.markdown(
+        "Dies ist ein interaktiver Prototyp zur Simulation von Wertpapier-Portfolios, entwickelt im Rahmen des Studiums 'Digital Technology and Innovation'."
+    )
+    st.divider()
+    
+    st.markdown("### Starten Sie Ihre persönliche Simulation")
+    st.button(
+        "📈 Zur Simulation starten", 
+        on_click=go_to_simulation,
+        use_container_width=True,
+        type="primary"
+    )
+    
+    st.divider()
+    
+    st.markdown("### Was simuliert dieses Tool?")
+    st.markdown(
+        "Dieses Tool führt ein **Backtesting** durch. Es nutzt reale, historische Kursdaten von `yfinance`, um die Wertentwicklung eines von dir zusammengestellten Portfolios in der Vergangenheit nachzubilden."
+    )
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown(f"#### 💸 Einzahlungen")
+        st.markdown(
+            """
+            - **Einmalerlag:** Ein Startkapital, das Sie zu Beginn investieren.
+            - **Sparplan:** Regelmäßige (z.B. monatliche) Einzahlungen, die Ihr Portfolio kontinuierlich aufbauen.
+            """
+        )
+    with col2:
+        st.markdown(f"#### 📉 Inflation & Kosten")
+        st.markdown(
+            """
+            - **Inflation (Real):** Zeigt die "echte" Wertentwicklung nach Abzug der Inflation (Kaufkraftverlust).
+            - **Kosten (Nominal):** Berücksichtigt Gebühren wie den Ausgabeaufschlag, die Ihre investierte Summe und somit die Rendite schmälern.
+            """
+        )
+    with col3:
+        st.markdown(f"#### 📈 Rendite (KPIs)")
+        st.markdown(
+            """
+            - **Nominale Rendite:** Die reine Wertentwicklung Ihres Portfolios in Prozent, ohne Inflation.
+            - **Reale Rendite:** Die inflationsbereinigte Rendite. Sie zeigt, wie stark Ihr Vermögen *tatsächlich* an Kaufkraft gewonnen hat.
+            """
+        )
+
+
+elif st.session_state.active_tab == "⚙️ Simulation (Setup)":
+    
+    def handle_add_click():
+        name_to_add = ""
+        isin_to_add = ""
+        is_valid = False
+
+        if st.session_state.katalog_auswahl != "Bitte wählen...":
+            name_to_add = st.session_state.katalog_auswahl
+            isin_to_add = KATALOG[st.session_state.katalog_auswahl]
+            is_valid = True
+        elif st.session_state.manuelle_isin:
+            isin_to_add = st.session_state.manuelle_isin
+            with st.spinner(f"Prüfe Ticker {isin_to_add}..."):
+                is_valid, message_or_name = backend_simulation.validate_and_get_info(
+                    isin_to_add
+                )
+                if is_valid:
+                    name_to_add = message_or_name
+                else:
+                    st.toast(
+                        f"Ticker/ISIN '{isin_to_add}' nicht gefunden.", icon="❌"
+                    )
+                    st.warning(f"Technischer Grund: {message_or_name}")
+        
+        if is_valid and isin_to_add:
+            st.session_state.assets.append(
+                {
+                    "Name": name_to_add,
+                    "ISIN / Ticker": isin_to_add,
+                    "Einmalerlag (€)": 1000.0,
+                    "Sparbetrag (€)": 100.0,
+                    "Spar-Intervall": "monatlich",
+                }
+            )
+            st.toast(f"Titel '{name_to_add}' hinzugefügt!", icon="✅")
+            st.session_state.katalog_auswahl = "Bitte wählen..."
+            st.session_state.manuelle_isin = ""
+            st.session_state.active_tab = "⚙️ Simulation (Setup)"
+        elif not is_valid and not st.session_state.manuelle_isin:
+            st.toast("Bitte Titel auswählen oder ISIN eingeben.", icon="⚠️")
+
+    
+    st.subheader("📊 Schritt 1: Simulations-Parameter festlegen")
+    col1, col2, col3, col4 = st.columns([1.5, 1.5, 1, 1])
+    with col1:
+        start_datum = st.date_input("Startdatum", date(2020, 1, 1), key="sim_start_date")
+    with col2:
+        end_datum = st.date_input("Enddatum", date.today(), key="sim_end_date")
+    with col3:
+        inflation_rate_input = st.slider(
+            "Erw. Inflation p.a. (%)",
+            0.0,
+            10.0,
+            value=st.session_state.inflation_slider,
+            key="inflation_slider",
+            step=0.1,
+            help="Wird zur Berechnung der 'realen' Performance verwendet.",
+        )
+    with col4:
+        st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+        with st.popover("💸 Kosten", use_container_width=True):
+            
+            st.number_input(
+                "Ausgabeaufschlag (%)", 0.0, 10.0, 
+                value=st.session_state.cost_ausgabe,
+                key="cost_ausgabe", 
+                step=0.1
+            )
+            st.number_input(
+                "Managementgebühr (% p.a.)", 0.0, 10.0, 
+                value=st.session_state.cost_management,
+                key="cost_management", 
+                step=0.01
+            )
+            st.number_input(
+                "Depotgebühr (€ p.a.)", 0.0, 
+                value=st.session_state.cost_depot,
+                key="cost_depot", 
+                step=1.0
+            )
+    
+    st.divider()
+
+    st.subheader("💰 Schritt 2: Titel zum Portfolio hinzufügen")
+    edited_assets = st.data_editor(
+        st.session_state.assets,
+        num_rows="dynamic",
+        column_config={
+            "Name": st.column_config.TextColumn("Name (Optional)"),
+            "ISIN / Ticker": st.column_config.TextColumn("ISIN / Ticker", required=True),
+            "Einmalerlag (€)": st.column_config.NumberColumn("Einmalerlag (€)", min_value=0.0),
+            "Sparbetrag (€)": st.column_config.NumberColumn("Sparbetrag (€)", min_value=0.0),
+            "Spar-Intervall": st.column_config.SelectboxColumn(
+                "Spar-Intervall", options=["monatlich", "vierteljährlich", "jährlich"], required=True
+            ),
+        },
+        hide_index=True,
+        use_container_width=True,
+        key="portfolio_table",
+    )
+    st.session_state.assets = edited_assets
+
+    with st.form(key="add_title_form", clear_on_submit=False):
+        kat_col1, kat_col2, kat_col3 = st.columns([2, 2, 1])
+        with kat_col1:
+            st.selectbox("Titel aus Katalog wählen", KATALOG.keys(), key="katalog_auswahl")
+        with kat_col2:
+            st.text_input("Oder ISIN / Ticker manuell eingeben", key="manuelle_isin")
+        with kat_col3:
+            st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+            st.form_submit_button("Hinzufügen", use_container_width=True, on_click=handle_add_click)
+    
+    st.divider()
+
+    st.subheader("🚀 Schritt 3: Simulation starten")
+    run_button = st.button(
+        "Historische Simulation berechnen", 
+        type="primary",
+        use_container_width=True,
+        key="run_simulation_button",
+    )
+
+    if run_button:
+        assets_to_simulate = [asset for asset in st.session_state.assets if asset.get("ISIN / Ticker")]
+        if not assets_to_simulate:
+            st.warning("Bitte füge mindestens einen gültigen Titel zum Portfolio hinzu.")
+            st.stop()
+
+        is_valid = True
+        with st.spinner("Prüfe Ticker/ISINs aus der Tabelle..."):
+            for asset in assets_to_simulate:
+                isin = asset.get("ISIN / Ticker")
+                valid, message = backend_simulation.validate_and_get_info(isin)
+                if not valid:
+                    st.error(f"Fehlerhafte Eingabe: Ticker/ISIN '{isin}' ('{asset.get('Name')}') konnte nicht validiert werden.")
+                    st.warning(f"👉 Technischer Grund: {message}")
+                    is_valid = False
+        
+        if is_valid:
+            st.session_state.simulations_daten = None 
+            st.session_state.prognose_daten = None 
+            
+            with st.spinner("Lade Daten und berechne Portfolio-Simulation..."):
+                st.session_state.simulations_daten = portfolio_logic.run_portfolio_simulation(
+                    assets=assets_to_simulate,
+                    start_date=start_datum,
+                    end_date=end_datum,
+                    inflation_rate_pa=st.session_state.inflation_slider, 
+                    ausgabeaufschlag_pct=st.session_state.cost_ausgabe,
+                    managementgebuehr_pa_pct=st.session_state.cost_management,
+                    depotgebuehr_pa_eur=st.session_state.cost_depot,
+                )
+            
+            if st.session_state.simulations_daten is None:
+                st.error("Simulation konnte nicht durchgeführt werden. Bitte Eingaben prüfen.")
+            else:
+                st.toast("Historische Simulation erfolgreich!", icon="🎉")
+    
+    
+    if st.session_state.simulations_daten is not None:
+        
+        st.divider()
+        st.subheader("📊 Ergebnisse: Historische Simulation")
+        
+        simulations_daten = st.session_state.simulations_daten
+        
+        chart_col, kpi_col = st.columns([3, 1])
+        
+        with chart_col:
+            fig = plotting.create_simulation_chart(simulations_daten, None) 
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with kpi_col:
+            st.markdown('<div style="margin-top: 25px;"></div>', unsafe_allow_html=True)
+            try:
+                daten_fuer_kpi = simulations_daten
+                kpi_label_suffix = " (Historisch)"
+                last_row = daten_fuer_kpi.iloc[-1]
+                end_value_nominal = last_row["Portfolio (nominal)"]
+                end_value_real = last_row["Portfolio (real)"]
+                total_investment = last_row["Einzahlungen (brutto)"]
+
+                if total_investment > 0:
+                    rendite_real_prozent = ((end_value_real / total_investment) - 1) * 100
+                    rendite_nominal_prozent = ((end_value_nominal / total_investment) - 1) * 100
+                else:
+                   rendite_real_prozent = 0.0
+                   rendite_nominal_prozent = 0.0
+
+                st.metric(f"Gesamteinzahlung (brutto){kpi_label_suffix}", f"€ {total_investment:,.2f}")
+                st.metric(f"Endkapital (nominal){kpi_label_suffix}", f"€ {end_value_nominal:,.2f}")
+                st.metric(f"Endkapital (real){kpi_label_suffix}", f"€ {end_value_real:,.2f}")
+                st.metric(f"Rendite (nominal){kpi_label_suffix}", f"{rendite_nominal_prozent:,.2f} %")
+                st.metric(f"Rendite (real){kpi_label_suffix}", f"{rendite_real_prozent:,.2f} %")
+            except Exception as e:
+                st.error(f"Fehler bei KPI-Berechnung: {e}")
+
+        st.button(
+            "🔮 Zur Prognose wechseln", 
+            on_click=go_to_prognose, 
+            use_container_width=True
+        )
+        
+        with st.expander("🔍 Zeige aggregierte historische Ergebnisdaten (Täglich)"):
+            st.dataframe(simulations_daten)
+
+
+elif st.session_state.active_tab == "📈 Prognose & Ergebnisse":
+    
+    simulations_daten = st.session_state.simulations_daten
+
+    if simulations_daten is None:
+        st.warning("Bitte führe zuerst eine Simulation im Tab 'Simulation (Setup)' durch.")
+        st.stop()
+
+
+    st.subheader("🔮 Prognose-Parameter")
+    st.caption("Ändere die Parameter, um die Prognose im Chart live zu aktualisieren.")
+    
+    def update_prognose():
+        sim_data = st.session_state.simulations_daten 
+        if sim_data is None:
+            st.session_state.prognose_daten = None
+            return
+
+        if st.session_state.prognose_jahre > 0:
+            assets_fuer_prognose = [asset for asset in st.session_state.assets if asset.get("ISIN / Ticker")]
+            
+            st.session_state.prognose_daten = prognose_logic.run_forecast(
+                historische_daten=sim_data,
+                assets=assets_fuer_prognose,
+                prognose_jahre=st.session_state.prognose_jahre,
+                sparplan_fortfuehren=st.session_state.prognose_sparplan,
+                kosten_management_pa_pct=st.session_state.cost_management,
+                kosten_depot_pa_eur=st.session_state.cost_depot,
+                inflation_rate_pa=st.session_state.inflation_slider, 
+                ausgabeaufschlag_pct=st.session_state.cost_ausgabe
+            )
+        else:
+             st.session_state.prognose_daten = None
+
+    prog_col1, prog_col2 = st.columns(2)
+    with prog_col1:
+        st.number_input(
+            "Prognose-Horizont (Jahre)", 0, 50, key="prognose_jahre", step=1,
+            help="Wie viele Jahre soll in die Zukunft prognostiziert werden? (0 = keine Prognose).",
+            on_change=update_prognose
+        )
+    with prog_col2:
+        st.checkbox(
+            "Sparplan in Prognose fortführen", key="prognose_sparplan",
+            help="Sollen die Sparpläne (siehe Tab 'Simulation (Setup)') in der Zukunft weiterlaufen?",
+            on_change=update_prognose
+        )
+
+    if st.session_state.prognose_jahre > 0 and st.session_state.prognose_daten is None:
+        update_prognose()
+
+    prognose_daten = st.session_state.prognose_daten
+    
+    st.divider()
+
+    st.subheader("📊 Ergebnisse: Simulation + Prognose")
+    
+    fig = plotting.create_simulation_chart(simulations_daten, prognose_daten)
+    st.plotly_chart(fig, use_container_width=True)
+
+    with st.expander("🔍 Zeige aggregierte historische Ergebnisdaten (Täglich)"):
+        st.dataframe(simulations_daten)
+    
+    if prognose_daten is not None:
+        with st.expander("🔮 Zeige aggregierte Prognose-Ergebnisdaten (Täglich)"):
+            st.dataframe(prognose_daten)
