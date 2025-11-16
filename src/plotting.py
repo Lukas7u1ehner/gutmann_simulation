@@ -15,18 +15,23 @@ except ImportError:
     GUTMANN_SECONDARY_DARK = "#3E524D"
     GUTMANN_DARK_GREEN = "#25342F"
 
-PROGNOSE_NOMINAL_COLOR = "#1E90FF"
-PROGNOSE_REAL_COLOR = "#00FFFF"
-PROGNOSE_EINZAHLUNG_COLOR = "#A9A9A9"
+# Farben für die Prognose-Bänder
+PROGNOSE_MEDIAN_COLOR = "#1E90FF"  # Kräftiges Blau für die Median-Linie
+PROGNOSE_REAL_MEDIAN_COLOR = "#00FFFF" # Cyan für die reale Median-Linie
+# --- KORREKTUR: Linienfarben (deckend) und dicker ---
+PROGNOSE_BEST_LINE_COLOR = "rgba(0, 200, 0, 1.0)"  # Deckend Grün
+PROGNOSE_WORST_LINE_COLOR = "rgba(200, 0, 0, 1.0)" # Deckend Rot
+PROGNOSE_EINZAHLUNG_COLOR = "#707070" # Dunkleres Grau
 
 
 def create_simulation_chart(
     df_history: pd.DataFrame, 
     df_forecast: pd.DataFrame = None,
-    title: str = "Simulierte Portfolio-Entwicklung" # NEUER Parameter
+    title: str = "Simulierte Portfolio-Entwicklung"
 ):
     fig = go.Figure()
 
+    # --- 1. HISTORISCHE DATEN (wie zuvor) ---
     fig.add_trace(
         go.Scatter(
             x=df_history.index,
@@ -36,7 +41,6 @@ def create_simulation_chart(
             line=dict(color=GUTMANN_ACCENT_GREEN, width=2.5),
         )
     )
-
     fig.add_trace(
         go.Scatter(
             x=df_history.index,
@@ -44,88 +48,120 @@ def create_simulation_chart(
             mode="lines",
             name="Portfolio (real, historisch)",
             line=dict(
-                color=GUTMANN_LIGHT_TEXT, width=2, dash="dash"
+                color='#707070', width=2, dash="dash"
             ),
         )
     )
-
     fig.add_trace(
         go.Scatter(
             x=df_history.index,
             y=df_history["Einzahlungen (brutto)"],
             mode="lines",
             name="Einzahlungen (brutto, historisch)",
-            line=dict(color=GUTMANN_SECONDARY_DARK, width=2.5),
+            line=dict(color='#303030', width=2.5),
         )
     )
 
+    # --- 2. PROGNOSE-DATEN (NEU mit Monte Carlo) ---
     if df_forecast is not None and not df_forecast.empty:
+        
+        # --- B: Median-Linie (Nominal) ---
         fig.add_trace(
             go.Scatter(
                 x=df_forecast.index,
-                y=df_forecast["Portfolio (nominal)"],
+                y=df_forecast["Portfolio (Median)"],
                 mode="lines",
-                name="Portfolio (nominal, prognose)",
+                name="Prognose Median (nominal)",
                 line=dict(
-                    color=PROGNOSE_NOMINAL_COLOR, width=2.5, dash="dash"
+                    color=PROGNOSE_MEDIAN_COLOR, width=2.5, dash="dash"
+                ),
+            )
+        )
+        
+        # --- A: Linien für Best/Worst Case (Nominal) ---
+        # --- KORREKTUR: 'fill=None' und 'width=2.0' ---
+        fig.add_trace(
+            go.Scatter(
+                x=df_forecast.index,
+                y=df_forecast["Portfolio (BestCase)"],
+                mode="lines",
+                name="Best Case (95%)",
+                line=dict(color=PROGNOSE_BEST_LINE_COLOR, width=2.0, dash="dot"), # Dicker, deckend
+                fill=None # Keine Füllung
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=df_forecast.index,
+                y=df_forecast["Portfolio (WorstCase)"],
+                mode="lines",
+                name="Worst Case (5%)",
+                line=dict(color=PROGNOSE_WORST_LINE_COLOR, width=2.0, dash="dot"), # Dicker, deckend
+                fill=None # Keine Füllung
+            )
+        )
+        
+        # --- C: Median-Linie (Real) ---
+        fig.add_trace(
+            go.Scatter(
+                x=df_forecast.index,
+                y=df_forecast["Portfolio (Real_Median)"],
+                mode="lines",
+                name="Prognose Median (real)",
+                line=dict(
+                    color=PROGNOSE_REAL_MEDIAN_COLOR, width=2, dash="dot"
                 ),
             )
         )
 
-        fig.add_trace(
-            go.Scatter(
-                x=df_forecast.index,
-                y=df_forecast["Portfolio (real)"],
-                mode="lines",
-                name="Portfolio (real, prognose)",
-                line=dict(
-                    color=PROGNOSE_REAL_COLOR, width=2, dash="dot"
-                ),
-            )
-        )
-
+        # --- D: Einzahlungen (Deterministisch) ---
         fig.add_trace(
             go.Scatter(
                 x=df_forecast.index,
                 y=df_forecast["Einzahlungen (brutto)"],
-                mode="lines",
-                name="Einzahlungen (brutto, prognose)",
-                line=dict(
-                    color=PROGNOSE_EINZAHLUNG_COLOR, width=2.5, dash="dash"
-                ),
-            )
+            mode="lines",
+            name="Einzahlungen (brutto, prognose)",
+            line=dict(
+                color=PROGNOSE_EINZAHLUNG_COLOR, width=2.5, dash="dash"
+            ),
         )
-
+        )
+    # --- 3. LAYOUT (KORREKTUR: Heller Hintergrund + Achsen-Titel-Farben) ---
     fig.update_layout(
-        title_text=title, # NEU: Dynamischer Titel
-        title_font_color=GUTMANN_LIGHT_TEXT,
+        title_text=title,
+        title_font_color='#000000', 
         xaxis_title="Datum",
         yaxis_title="Wert in €",
+        xaxis_title_font_color='#000000', # KORREKTUR: Explizit gesetzt
+        yaxis_title_font_color='#000000', # KORREKTUR: Explizit gesetzt
         hovermode="x unified",
         legend=dict(
-            yanchor="top", y=0.99, xanchor="left", x=0.01, font_color=GUTMANN_LIGHT_TEXT
+            yanchor="top", y=0.99, xanchor="left", x=0.01, 
+            font_color='#000000'
         ),
-        plot_bgcolor=GUTMANN_DARK_GREEN,
-        paper_bgcolor=GUTMANN_DARK_GREEN,
-        font_color=GUTMANN_LIGHT_TEXT,
+        plot_bgcolor='white', 
+        paper_bgcolor='white', 
+        font_color='#000000', 
         height=600,
         xaxis=dict(
             showgrid=True,
-            gridcolor=GUTMANN_SECONDARY_DARK,
+            gridcolor='#e0e0e0',
             showline=True,
-            linecolor="black",
+            linecolor="#000000",
             linewidth=2,
             zeroline=True,
-            zerolinecolor=GUTMANN_SECONDARY_DARK,
+            zerolinecolor='#c0c0c0',
+            tickfont=dict(color='#000000') # KORREKTUR: Achsen-Zahlen
         ),
         yaxis=dict(
             showgrid=True,
-            gridcolor=GUTMANN_SECONDARY_DARK,
+            gridcolor='#e0e0e0',
             showline=True,
-            linecolor="black",
+            linecolor="#000000",
             linewidth=2,
             zeroline=True,
-            zerolinecolor=GUTMANN_SECONDARY_DARK,
+            zerolinecolor='#c0c0c0',
+            tickfont=dict(color='#000000') # KORREKTUR: Achsen-Zahlen
         ),
     )
 
@@ -133,8 +169,8 @@ def create_simulation_chart(
 
 
 def create_price_chart(df: pd.DataFrame):
+    # Diese Funktion bleibt unverändert
     fig = go.Figure()
-
     fig.add_trace(
         go.Scatter(
             x=df.index,
@@ -145,35 +181,39 @@ def create_price_chart(df: pd.DataFrame):
         )
     )
 
+    # --- KORREKTUR: Heller Hintergrund + Achsen-Titel-Farben ---
     fig.update_layout(
         title_text="Historischer Kursverlauf (ISIN)",
-        title_font_color=GUTMANN_LIGHT_TEXT,
+        title_font_color='#000000',
         xaxis_title="Datum",
         yaxis_title="Preis in €",
+        xaxis_title_font_color='#000000', # KORREKTUR: Explizit gesetzt
+        yaxis_title_font_color='#000000', # KORREKTUR: Explizit gesetzt
         hovermode="x unified",
         height=500,
-        plot_bgcolor=GUTMANN_DARK_GREEN,
-        paper_bgcolor=GUTMANN_DARK_GREEN,
-        font_color=GUTMANN_LIGHT_TEXT,
-        legend=dict(font_color=GUTMANN_LIGHT_TEXT),
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        font_color='#000000',
+        legend=dict(font_color='#000000'),
         xaxis=dict(
             showgrid=True,
-            gridcolor=GUTMANN_SECONDARY_DARK,
+            gridcolor='#e0e0e0',
             showline=True,
-            linecolor="black",
+            linecolor="#000000",
             linewidth=2,
             zeroline=True,
-            zerolinecolor=GUTMANN_SECONDARY_DARK,
+            zerolinecolor='#c0c0c0',
+            tickfont=dict(color='#000000') # KORREKTUR: Achsen-Zahlen
         ),
         yaxis=dict(
             showgrid=True,
-            gridcolor=GUTMANN_SECONDARY_DARK,
+            gridcolor='#e0e0e0',
             showline=True,
-            linecolor="black",
+            linecolor="#000000",
             linewidth=2,
             zeroline=True,
-            zerolinecolor=GUTMANN_SECONDARY_DARK,
+            zerolinecolor='#c0c0c0',
+            tickfont=dict(color='#000000') # KORREKTUR: Achsen-Zahlen
         ),
     )
-
     return fig

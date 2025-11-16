@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import date, timedelta
 import sys, os
+import numpy as np # Import für numpy
 
 st.set_page_config(page_title="Simulation | Gutmann", page_icon="📈", layout="wide")
 
@@ -26,32 +27,45 @@ except ImportError as e:
     )
     st.stop()
 
+# --- KORREKTUR: Risikoprofile & Dynamische Labels ---
+RISK_PROFILES = {
+    "Konservativ": {
+        "beschreibung": "Wenig Schwankung, langsam wachsend",
+        "volatilitaet_pa": 10.0
+    },
+    "Ausgewogen": {
+        "beschreibung": "Durchschnittliches Risiko",
+        "volatilitaet_pa": 17.0
+    },
+    "Offensiv": {
+        "beschreibung": "Starke Schwankung, hohe Chance, aber auch hohe Verlustrisiken",
+        "volatilitaet_pa": 25.0
+    }
+}
+# Erstellt ein Mapping von "Label (mit %)" -> "Basis-Key"
+# z.B. {"Ausgewogen (17.0% p.a.)": "Ausgewogen"}
+RISK_PROFILES_LABELS_MAP = {
+    f"{k} ({v['volatilitaet_pa']:.1f}% p.a.)": k 
+    for k, v in RISK_PROFILES.items()
+}
+# Nur die Liste der Labels für die Dropdown-Optionen
+RISK_PROFILES_OPTIONS = list(RISK_PROFILES_LABELS_MAP.keys())
+
+DEFAULT_RISK_PROFILE_KEY = "Ausgewogen" # Der Basis-Key
+DEFAULT_VOLATILITY = RISK_PROFILES[DEFAULT_RISK_PROFILE_KEY]["volatilitaet_pa"]
+DEFAULT_N_SIMULATIONS = 500
+
 
 # --- SESSION STATE INITIALISIERUNG (ERWEITERT) ---
 if "active_tab" not in st.session_state:
     st.session_state.active_tab = "🏠 Startseite"
 if "katalog_auswahl" not in st.session_state:
     st.session_state.katalog_auswahl = "Bitte wählen..."
-# ... (assets, etc. bleiben gleich) ...
 if "assets" not in st.session_state:
     st.session_state.assets = [
-        {
-            "Name": "S&P 500 ETF",
-            "ISIN / Ticker": "IE00B5BMR087",
-            "Einmalerlag (€)": 1000.0,
-            "Sparbetrag (€)": 100.0,
-            "Spar-Intervall": "monatlich",
-        },
-        {
-            "Name": "Apple Aktie",
-            "ISIN / Ticker": "US0378331005",
-            "Einmalerlag (€)": 500.0,
-            "Sparbetrag (€)": 50.0,
-            "Spar-Intervall": "monatlich",
-        },
+        {"Name": "S&P 500 ETF", "ISIN / Ticker": "IE00B5BMR087", "Einmalerlag (€)": 1000.0, "Sparbetrag (€)": 100.0, "Spar-Intervall": "monatlich"},
+        {"Name": "Apple Aktie", "ISIN / Ticker": "US0378331005", "Einmalerlag (€)": 500.0, "Sparbetrag (€)": 50.0, "Spar-Intervall": "monatlich"},
     ]
-
-# Kosten & Inflation (HAUPT-STATES)
 if "cost_ausgabe" not in st.session_state:
     st.session_state.cost_ausgabe = 2.0
 if "cost_management" not in st.session_state:
@@ -60,14 +74,18 @@ if "cost_depot" not in st.session_state:
     st.session_state.cost_depot = 50.0
 if "inflation_slider" not in st.session_state:
     st.session_state.inflation_slider = 3.0
-
-# Prognose-Parameter (HAUPT-STATES)
 if "prognose_jahre" not in st.session_state:
     st.session_state.prognose_jahre = 0
 if "prognose_sparplan" not in st.session_state:
     st.session_state.prognose_sparplan = True
+if "n_simulations" not in st.session_state:
+    st.session_state.n_simulations = DEFAULT_N_SIMULATIONS
+if "risk_profile" not in st.session_state:
+    st.session_state.risk_profile = DEFAULT_RISK_PROFILE_KEY # Haupt-State nutzt Basis-Key
+if "selected_volatility_pa" not in st.session_state:
+    st.session_state.selected_volatility_pa = DEFAULT_VOLATILITY
 
-# --- NEU: SEPARATE WIDGET-KEYS (basierend auf deinem Rendite-Muster) ---
+# --- SEPARATE WIDGET-KEYS ---
 if "widget_cost_ausgabe" not in st.session_state:
     st.session_state.widget_cost_ausgabe = st.session_state.cost_ausgabe
 if "widget_cost_management" not in st.session_state:
@@ -78,8 +96,14 @@ if "widget_inflation_slider" not in st.session_state:
     st.session_state.widget_inflation_slider = st.session_state.inflation_slider
 if "widget_prognose_jahre" not in st.session_state:
     st.session_state.widget_prognose_jahre = st.session_state.prognose_jahre
-# (prognose_sparplan als Checkbox ist meist unproblematisch, bleibt wie es ist)
-# --- ENDE NEUE WIDGET-KEYS ---
+if "widget_prognose_sparplan_label" not in st.session_state:
+    st.session_state.widget_prognose_sparplan_label = "Ja" if st.session_state.prognose_sparplan else "Nein"
+if "widget_n_simulations" not in st.session_state:
+    st.session_state.widget_n_simulations = st.session_state.n_simulations
+if "widget_risk_profile" not in st.session_state:
+    # Finde das volle Label (z.B. "Ausgewogen (17.0% p.a.)") basierend auf dem Basis-Key
+    default_full_label = [label for label, base_key in RISK_PROFILES_LABELS_MAP.items() if base_key == DEFAULT_RISK_PROFILE_KEY][0]
+    st.session_state.widget_risk_profile = default_full_label
 
 # Daten-Container
 if "simulations_daten" not in st.session_state:
@@ -107,7 +131,7 @@ tabs_options = ["🏠 Startseite", "⚙️ Historische Simulation"]
 if st.session_state.simulations_daten is not None:
     tabs_options.append("📈 Zukunftsprognose")
 st.radio(" ", options=tabs_options, key="active_tab", horizontal=True)
-st.divider()
+
 
 
 # --- TAB 1: STARTSEITE (bleibt gleich) ---
@@ -115,10 +139,8 @@ if st.session_state.active_tab == "🏠 Startseite":
     st.markdown(f"""<div style="display: flex; align-items: center; justify-content: center; margin-top: 20px; margin-bottom: 30px;"><img src="{GUTMANN_LOGO_URL}" alt="Bank Gutmann Logo" style="width: 350px;"></div>""", unsafe_allow_html=True)
     st.title("Willkommen zur Bank Gutmann Wertpapier-Simulation")
     st.markdown("Dies ist ein interaktiver Prototyp zur Simulation von Wertpapier-Portfolios, entwickelt im Rahmen des Studiums 'Digital Technology and Innovation'.")
-    st.divider()
     st.markdown("### Starten Sie Ihre persönliche Simulation")
     st.button("📈 Zur Simulation starten", on_click=go_to_setup, use_container_width=True, type="primary")
-    st.divider()
     st.markdown("### Was simuliert dieses Tool?")
     st.markdown("Dieses Tool führt ein **Backtesting** durch. Es nutzt reale, historische Kursdaten von `yfinance`, um die Wertentwicklung eines von dir zusammengestellten Portfolios in der Vergangenheit nachzubilden.")
     col1, col2, col3 = st.columns(3)
@@ -149,7 +171,6 @@ elif st.session_state.active_tab == "⚙️ Historische Simulation":
         name_to_add = ""
         isin_to_add = ""
         is_valid = False
-
         if st.session_state.katalog_auswahl != "Bitte wählen...":
             name_to_add = st.session_state.katalog_auswahl
             isin_to_add = KATALOG[st.session_state.katalog_auswahl]
@@ -223,10 +244,8 @@ elif st.session_state.active_tab == "⚙️ Historische Simulation":
                             on_change=callback_inflation_costs, 
                             step=1.0)
     
-    st.divider()
 
     st.subheader("💰 Schritt 2: Titel zum Portfolio hinzufügen")
-    # ... (Data Editor, Form, etc. bleiben unverändert) ...
     edited_assets = st.data_editor(
         st.session_state.assets,
         num_rows="dynamic",
@@ -254,7 +273,6 @@ elif st.session_state.active_tab == "⚙️ Historische Simulation":
             st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
             st.form_submit_button("Hinzufügen", use_container_width=True, on_click=handle_add_click)
     
-    st.divider()
 
     st.subheader("🚀 Schritt 3: Historische Simulation starten")
     run_button = st.button(
@@ -265,7 +283,6 @@ elif st.session_state.active_tab == "⚙️ Historische Simulation":
     )
 
     if run_button:
-        # ... (Validierungslogik bleibt gleich) ...
         assets_to_simulate = [asset for asset in st.session_state.assets if asset.get("ISIN / Ticker")]
         if not assets_to_simulate:
             st.warning("Bitte füge mindestens einen gültigen Titel zum Portfolio hinzu.")
@@ -293,10 +310,10 @@ elif st.session_state.active_tab == "⚙️ Historische Simulation":
                     assets=assets_to_simulate,
                     start_date=start_datum,
                     end_date=end_datum,
-                    inflation_rate_pa=st.session_state.inflation_slider, # <-- Verwendet den Haupt-Key
-                    ausgabeaufschlag_pct=st.session_state.cost_ausgabe,     # <-- Verwendet den Haupt-Key
-                    managementgebuehr_pa_pct=st.session_state.cost_management, # <-- Verwendet den Haupt-Key
-                    depotgebuehr_pa_eur=st.session_state.cost_depot,       # <-- Verwendet den Haupt-Key
+                    inflation_rate_pa=st.session_state.inflation_slider,
+                    ausgabeaufschlag_pct=st.session_state.cost_ausgabe,
+                    managementgebuehr_pa_pct=st.session_state.cost_management,
+                    depotgebuehr_pa_eur=st.session_state.cost_depot,
                 )
             
             if sim_data is None:
@@ -308,31 +325,15 @@ elif st.session_state.active_tab == "⚙️ Historische Simulation":
                 st.session_state.asset_final_values = final_values
                 st.session_state.prognosis_assumptions_pa = hist_returns.copy()
                 
-                # KORREKTUR: Dieser gesamte Block (ca. Zeile 314-325) wird entfernt.
-                # Er versucht, die Widget-Keys von außen zu überschreiben,
-                # was die StreamlitAPIException verursacht.
-                # Die Synchronisierung ist bereits durch die 'value'- und
-                # 'on_change'-Parameter der Widgets selbst sichergestellt.
-                
-                # ENTFERNTER BLOCK ANFANG
-                # for name, value in hist_returns.items():
-                #     widget_key = f"assumption_{name}"
-                #     if widget_key not in st.session_state:
-                #         st.session_state[widget_key] = value
-                # 
-                # # Synchronisiere auch die globalen Widget-Keys (falls sie sich geändert haben)
-                # st.session_state.widget_inflation_slider = st.session_state.inflation_slider
-                # st.session_state.widget_prognose_jahre = st.session_state.prognose_jahre
-                # st.session_state.widget_cost_ausgabe = st.session_state.cost_ausgabe
-                # st.session_state.widget_cost_management = st.session_state.cost_management
-                # st.session_state.widget_cost_depot = st.session_state.cost_depot
-                # ENTFERNTER BLOCK ENDE
-
+                # Widget-Keys für den nächsten Tab initialisieren
+                for name, value in hist_returns.items():
+                    widget_key = f"assumption_{name}"
+                    if widget_key not in st.session_state:
+                        st.session_state[widget_key] = value
 
     
     if st.session_state.simulations_daten is not None:
-        # ... (Anzeige der Ergebnisse, KPIs, etc. bleibt unverändert) ...
-        st.divider()
+
         st.subheader("📊 Ergebnisse: Historische Simulation")
         simulations_daten = st.session_state.simulations_daten
         chart_col, kpi_col = st.columns([3, 1])
@@ -348,14 +349,12 @@ elif st.session_state.active_tab == "⚙️ Historische Simulation":
                 end_value_nominal = last_row["Portfolio (nominal)"]
                 end_value_real = last_row["Portfolio (real)"]
                 total_investment = last_row["Einzahlungen (brutto)"]
-
                 if total_investment > 0:
                     rendite_real_prozent = ((end_value_real / total_investment) - 1) * 100
                     rendite_nominal_prozent = ((end_value_nominal / total_investment) - 1) * 100
                 else:
                     rendite_real_prozent = 0.0
                     rendite_nominal_prozent = 0.0
-
                 st.metric("Gesamteinzahlung (brutto)", f"€ {total_investment:,.2f}")
                 st.metric("Endkapital (nominal)", f"€ {end_value_nominal:,.2f}")
                 st.metric("Endkapital (real)", f"€ {end_value_real:,.2f}")
@@ -364,7 +363,7 @@ elif st.session_state.active_tab == "⚙️ Historische Simulation":
             except Exception as e:
                 st.error(f"Fehler bei KPI-Berechnung: {e}")
 
-        st.divider()
+
         st.subheader("📈 Berechnete Rendite p.a. (Historisch)")
         hist_returns = st.session_state.historical_returns_pa
         
@@ -377,7 +376,7 @@ elif st.session_state.active_tab == "⚙️ Historische Simulation":
                 with cols[i]:
                     st.metric(f"{name}", f"{rendite_pa:,.2f} % p.a.")
         
-        st.divider()
+
         st.button("🔮 Zur Zukunftsprognose wechseln", on_click=go_to_prognose, use_container_width=True)
         with st.expander("🔍 Zeige aggregierte historische Ergebnisdaten (Täglich)"):
             st.dataframe(simulations_daten)
@@ -387,14 +386,21 @@ elif st.session_state.active_tab == "⚙️ Historische Simulation":
 elif st.session_state.active_tab == "📈 Zukunftsprognose":
     
     simulations_daten = st.session_state.simulations_daten
-
     if simulations_daten is None:
         st.warning("Bitte führe zuerst eine Simulation im Tab 'Historische Simulation' durch.")
         st.stop()
 
     
-    # --- KERNFUNKTION (bleibt gleich) ---
-    def run_prognose_calculation(assumptions_dict: dict):
+    # --- KERNFUNKTION (wird von Callbacks aufgerufen) ---
+    def run_prognose_calculation():
+        """
+        Führt die Monte-Carlo-Simulation mit den aktuellen
+        Werten aus dem session_state aus.
+        """
+        if st.session_state.prognose_jahre <= 0:
+            st.session_state.prognose_daten = None
+            return
+
         last_row = simulations_daten.iloc[-1]
         start_values = {
             "letzter_tag": simulations_daten.index[-1],
@@ -402,73 +408,146 @@ elif st.session_state.active_tab == "📈 Zukunftsprognose":
             "real": last_row["Portfolio (real)"],
             "einzahlung": last_row["Einzahlungen (brutto)"]
         }
-        st.session_state.prognose_daten = prognose_logic.run_forecast(
-            start_values=start_values,
-            assets=st.session_state.assets,
-            prognose_jahre=st.session_state.prognose_jahre, # <-- Nutzt Haupt-Key
-            sparplan_fortfuehren=st.session_state.prognose_sparplan,
-            kosten_management_pa_pct=st.session_state.cost_management,
-            kosten_depot_pa_eur=st.session_state.cost_depot,
-            inflation_rate_pa=st.session_state.inflation_slider, 
-            ausgabeaufschlag_pct=st.session_state.cost_ausgabe,
-            expected_asset_returns_pa=assumptions_dict,
-            asset_final_values=st.session_state.asset_final_values
-        )
-
-    # --- CALLBACKS FÜR TAB 3 ---
-    def callback_global_params():
-        # KORREKTUR: Synchronisiere Widget-Key zu Haupt-Key
-        st.session_state.prognose_jahre = st.session_state.widget_prognose_jahre
-        # (Sparplan-Checkbox ist ok, da sie keinen 'value'-Parameter hat)
         
-        # Führe Prognose mit den *aktuellen* Asset-Annahmen aus
-        run_prognose_calculation(st.session_state.prognosis_assumptions_pa)
-
-    def callback_asset_params():
-        # Diese Funktion war bereits korrekt (das stabile Muster)
-        
-        # 1. Lese Annahmen aus den Widget-Keys
+        # Sicherstellen, dass die Asset-Annahmen synchronisiert sind
+        # (falls der Asset-Callback nicht der Auslöser war)
         assumptions_from_widgets = {}
         for asset_name in st.session_state.prognosis_assumptions_pa.keys():
             widget_key = f"assumption_{asset_name}"
             assumptions_from_widgets[asset_name] = st.session_state.get(widget_key, 0.0)
-        
-        # 2. Aktualisiere den Haupt-Assumptions-State (das Dictionary)
         st.session_state.prognosis_assumptions_pa = assumptions_from_widgets
         
-        # 3. Führe Prognose mit den neuen Annahmen aus
-        run_prognose_calculation(assumptions_from_widgets)
+        with st.spinner("Berechne Monte-Carlo-Simulation..."):
+            st.session_state.prognose_daten = prognose_logic.run_forecast(
+                start_values=start_values,
+                assets=st.session_state.assets,
+                prognose_jahre=st.session_state.prognose_jahre,
+                sparplan_fortfuehren=st.session_state.prognose_sparplan,
+                kosten_management_pa_pct=st.session_state.cost_management,
+                kosten_depot_pa_eur=st.session_state.cost_depot,
+                inflation_rate_pa=st.session_state.inflation_slider,
+                ausgabeaufschlag_pct=st.session_state.cost_ausgabe,
+                expected_asset_returns_pa=st.session_state.prognosis_assumptions_pa,
+                asset_final_values=st.session_state.asset_final_values,
+                # MC-Parameter übergeben
+                expected_volatility_pa=st.session_state.selected_volatility_pa,
+                n_simulations=st.session_state.n_simulations
+            )
+
+    # --- CALLBACKS FÜR TAB 3 ---
+    
+    def callback_global_params_sync():
+        """
+        Synchronisiert NUR die globalen Widget-States zu den Haupt-States.
+        Löst KEINE Neuberechnung aus, das macht callback_mc_params.
+        """
+        st.session_state.prognose_jahre = st.session_state.widget_prognose_jahre
+        st.session_state.prognose_sparplan = (st.session_state.widget_prognose_sparplan_label == "Ja")
+
+    def callback_asset_params():
+        """
+        Wird NUR von den Rendite-Annahmen-Widgets ausgelöst.
+        Synchronisiert und startet die Neuberechnung.
+        """
+        # 1. Asset-Annahmen synchronisieren (redundant, aber sicher)
+        assumptions_from_widgets = {}
+        for asset_name in st.session_state.prognosis_assumptions_pa.keys():
+             widget_key = f"assumption_{asset_name}"
+             assumptions_from_widgets[asset_name] = st.session_state.get(widget_key, 0.0)
+        st.session_state.prognosis_assumptions_pa = assumptions_from_widgets
+        
+        # 2. Neuberechnung auslösen
+        run_prognose_calculation()
+
+    def callback_mc_params():
+        """
+        Wird von ALLEN globalen Prognose-Parametern ausgelöst.
+        Synchronisiert ALLES und startet die Neuberechnung.
+        """
+        # 1. Globale Parameter synchronisieren
+        callback_global_params_sync()
+        
+        # 2. MC-Parameter synchronisieren
+        st.session_state.n_simulations = st.session_state.widget_n_simulations
+        
+        selected_label = st.session_state.widget_risk_profile
+        base_profile_name = RISK_PROFILES_LABELS_MAP[selected_label]
+        
+        st.session_state.risk_profile = base_profile_name
+        st.session_state.selected_volatility_pa = RISK_PROFILES[base_profile_name]["volatilitaet_pa"]
+        
+        # 3. Neuberechnung auslösen
+        run_prognose_calculation()
 
 
-    # --- UI FÜR PROGNOSE-PARAMETER ---
-    st.subheader("🔮 Prognose-Parameter (Global)")
-    prog_col1, prog_col2 = st.columns(2)
+    # --- KORREKTUR: UI-Parameter neu angeordnet (4 Spalten) ---
+    st.subheader("🔮 Prognose- & Monte-Carlo-Parameter")
+    
+    # Obere Zeile für die Haupt-Inputs
+    prog_col1, prog_col2, prog_col3, prog_col4 = st.columns(4)
+    
     with prog_col1:
-        # KORREKTUR: Angepasst an das Rendite-Muster
         st.number_input(
             "Prognose-Horizont (Jahre)", 
-            min_value=0,
-            max_value=50, 
-            step=1,
-            value=st.session_state.prognose_jahre, # <-- HAUPT-Key
-            key="widget_prognose_jahre",           # <-- WIDGET-Key
+            min_value=0, max_value=50, step=1,
+            value=st.session_state.prognose_jahre,
+            key="widget_prognose_jahre",       
             help="Wie viele Jahre soll in die Zukunft prognostiziert werden? (0 = keine Prognose).",
-            on_change=callback_global_params       # <-- SYNC-Callback
+            on_change=callback_mc_params # Wichtig: Ruft den MC-Callback auf     
         ) 
+        
     with prog_col2:
-        # Checkboxen sind meist unproblematisch, da sie 'value' nicht
-        # auf die gleiche Weise wie number_input/slider verwenden.
-        st.checkbox(
-            "Sparplan in Prognose fortführen", 
-            key="prognose_sparplan", # <-- Dieser Key ist OK
-            help="Sollen die Sparpläne (siehe Tab 'Historische Simulation') in der Zukunft weiterlaufen?",
-            on_change=callback_global_params
+        st.number_input(
+            "Anzahl Simulationen",
+            min_value=100, max_value=5000, step=100,
+            value=st.session_state.n_simulations,
+            key="widget_n_simulations",
+            on_change=callback_mc_params,
+            help="Mehr Simulationen = genauer, aber langsamer."
         )
-    st.caption("Globale Kosten & Inflation werden aus dem 'Historische Simulation'-Tab übernommen.")
-    st.divider()
+        
+    with prog_col3:
+        # Help-Text für die Risikoprofile
+        RISK_PROFILES_HELP = """
+        Bestimmt die angenommene Schwankungsbreite (Volatilität) für die Monte-Carlo-Simulation:
+        - **Konservativ (10.0% p.a.):** Wenig Schwankung, langsam wachsend
+        - **Ausgewogen (17.0% p.a.):** Durchschnittliches Risiko
+        - **Offensiv (25.0% p.a.):** Starke Schwankung, hohe Chance, aber auch hohe Verlustrisiken
+        """
+        
+        # Finde den Index des vollen Labels basierend auf dem Haupt-State
+        current_base_profile = st.session_state.risk_profile
+        try:
+            current_full_label = [label for label, base in RISK_PROFILES_LABELS_MAP.items() if base == current_base_profile][0]
+            current_index = RISK_PROFILES_OPTIONS.index(current_full_label)
+        except Exception:
+            current_index = 0 # Fallback
 
-    # --- UI FÜR ASSET-ANNAHMEN (Dein funktionierendes Muster) ---
+        st.selectbox(
+            "Risikoprofil", # KORREKTUR: Titel gekürzt, % im Label
+            options=RISK_PROFILES_OPTIONS, # Nutzt die neuen Labels
+            index=current_index,
+            key="widget_risk_profile",
+            on_change=callback_mc_params,
+            help=RISK_PROFILES_HELP
+        )
+
+    with prog_col4:
+        # KORREKTUR: Sparplan in diese Spalte verschoben
+        st.selectbox(
+            "Sparplan fortführen",
+            options=["Ja", "Nein"],
+            key="widget_prognose_sparplan_label", # Nutzt den Label-Key
+            on_change=callback_mc_params, # Ruft auch den MC-Callback auf
+            help="Sollen die Sparpläne (siehe Tab 'Historische Simulation') in der Zukunft weiterlaufen?"
+        )
+        
+    st.caption("Globale Kosten & Inflation werden aus dem 'Historische Simulation'-Tab übernommen.")
+    st.caption("Die *Volatilität* (Schwankung) wird oben global über das Risikoprofil für das *gesamte* Portfolio festgelegt.")
+
+    # --- UI FÜR ASSET-ANNAHMEN (Rendite) ---
     st.subheader("📈 Erwartete Rendite p.a. (Ihre Annahmen)")
+    
     
     assumptions_source = st.session_state.prognosis_assumptions_pa
     
@@ -480,41 +559,42 @@ elif st.session_state.active_tab == "📈 Zukunftsprognose":
         
         for i, (name, default_rendite_pa) in enumerate(assumptions_source.items()):
             widget_key = f"assumption_{name}"
+            # Initialisiere den Widget-Key, falls er fehlt
             if widget_key not in st.session_state:
                 st.session_state[widget_key] = assumptions_source.get(name, default_rendite_pa)
 
             with cols[i]:
-                # Dieser Code war schon immer korrekt
                 st.number_input(
                     f"{name} (% p.a.)",
                     min_value=-50.0,
                     max_value=50.0,
-                    value=default_rendite_pa, # <-- Wert aus Dictionary
+                    value=st.session_state[widget_key], # Liest vom Widget-Key
                     step=0.5,
-                    key=widget_key,           # <-- Separater Widget-Key
-                    on_change=callback_asset_params,
+                    key=widget_key, # Schreibt auf Widget-Key
+                    on_change=callback_asset_params, # Löst Asset-Callback aus
                     help=f"Ihre Annahme für die zukünftige Rendite von {name}."
                 )
 
-    # --- "Initialer Check" (bleibt gleich) ---
+    # --- "Initialer Check" (wird bei jedem Laden ausgeführt) ---
     if st.session_state.prognose_jahre > 0 and st.session_state.prognose_daten is None:
         # Ruft die Logik auf, um State zu synchronisieren & zu rechnen
-        callback_asset_params() 
+        run_prognose_calculation() 
 
     prognose_daten = st.session_state.prognose_daten
     
-    st.divider()
 
-    # --- ANZEIGE DER GRAFIK (bleibt gleich) ---
-    st.subheader("📊 Ergebnisse: Historie + Zukunftsprognose")
+    # --- ANZEIGE DER GRAFIK ---
+    st.subheader("📊 Ergebnisse: Historie + Monte-Carlo-Prognose")
     fig = plotting.create_simulation_chart(
         simulations_daten, 
         prognose_daten, 
         title="Portfolio-Entwicklung (Historie & Prognose)"
     )
     st.plotly_chart(fig, use_container_width=True)
+    
     with st.expander("🔍 Zeige aggregierte historische Ergebnisdaten (Täglich)"):
         st.dataframe(simulations_daten)
+    
     if prognose_daten is not None:
         with st.expander("🔮 Zeige aggregierte Prognose-Ergebnisdaten (Täglich)"):
             st.dataframe(prognose_daten)
