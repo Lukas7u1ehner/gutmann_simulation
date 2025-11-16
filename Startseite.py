@@ -206,7 +206,7 @@ elif st.session_state.active_tab == "⚙️ Historische Simulation":
     # --- ENDE CALLBACKS ---
 
     
-    st.subheader("📊 Schritt 1: Simulations-Parameter festlegen")
+    st.subheader("📊 Simulations-Parameter festlegen")
     col1, col2, col3, col4 = st.columns([1.5, 1.5, 1, 1])
     with col1:
         start_datum = st.date_input("Startdatum", date(2020, 1, 1), key="sim_start_date")
@@ -245,7 +245,7 @@ elif st.session_state.active_tab == "⚙️ Historische Simulation":
                             step=1.0)
     
 
-    st.subheader("💰 Schritt 2: Titel zum Portfolio hinzufügen")
+    st.subheader("💰Titel zum Portfolio hinzufügen")
     edited_assets = st.data_editor(
         st.session_state.assets,
         num_rows="dynamic",
@@ -274,7 +274,7 @@ elif st.session_state.active_tab == "⚙️ Historische Simulation":
             st.form_submit_button("Hinzufügen", use_container_width=True, on_click=handle_add_click)
     
 
-    st.subheader("🚀 Schritt 3: Historische Simulation starten")
+    st.subheader("🚀Historische Simulation starten")
     run_button = st.button(
         "Historische Simulation berechnen", 
         type="primary",
