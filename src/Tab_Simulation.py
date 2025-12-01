@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import date
 import numpy as np
+import yfinance as yf
 
 # Relative Imports innerhalb des src-Pakets
 from . import backend_simulation

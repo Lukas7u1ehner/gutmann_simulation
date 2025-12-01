@@ -1,4 +1,5 @@
 import streamlit as st
+import yfinance as yf
 from .style import (
     GUTMANN_LOGO_URL,
     GUTMANN_ACCENT_GREEN,

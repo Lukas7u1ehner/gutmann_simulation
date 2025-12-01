@@ -66,5 +66,65 @@ KATALOG = {
     "Österreichische Post Aktie": "AT0000APOST4",
     "Vienna Insurance Group Aktie": "AT00009VIG3",
 
-    # (Du kannst hier beliebig viele hinzufügen)
+    # --- ETFs (Ticker für XETRA/Frankfurt meist mit .DE) ---
+    "S&P 500 ETF (iShares)": "SXR8.DE",        # ISIN: IE00B5BMR087
+    "MSCI World ETF (iShares)": "EUNL.DE",     # ISIN: IE00B4L5Y983
+    "MSCI Emerging Markets ETF": "IS3N.DE",    # ISIN: IE00BKM4GZ66
+    "NASDAQ 100 ETF (iShares)": "SXRV.DE",     # ISIN: IE00B53SZB19
+    "STOXX Europe 600 ETF": "EXSA.DE",         # ISIN: DE0002635307
+
+    # --- US Tech (Original US Ticker) ---
+    "Apple Aktie": "AAPL",
+    "Microsoft Aktie": "MSFT",
+    "Amazon Aktie": "AMZN",
+    "Alphabet Aktie (Google A)": "GOOGL",
+    "NVIDIA Aktie": "NVDA",
+    "Tesla Aktie": "TSLA",
+    "Meta Platforms (Facebook)": "META",
+    "Netflix Aktie": "NFLX",
+    "Adobe Aktie": "ADBE",
+    "Salesforce Aktie": "CRM",
+    
+    # --- US Blue Chips ---
+    "Berkshire Hathaway B": "BRK-B",
+    "Johnson & Johnson": "JNJ",
+    "Procter & Gamble": "PG",
+    "Coca-Cola": "KO",
+    "PepsiCo": "PEP",
+    "McDonald's": "MCD",
+    "Walmart": "WMT",
+    "JPMorgan Chase": "JPM",
+    "Visa": "V",
+    "Mastercard": "MA",
+
+    # --- Europäische Aktien (Ticker oft mit .DE, .PA, .AS) ---
+    "LVMH (Frankreich)": "MC.PA",
+    "ASML (Niederlande)": "ASML.AS",
+    "Novo Nordisk (Dänemark)": "NOVO-B.CO",
+    "Nestlé (Schweiz)": "NESN.SW",
+    "Roche (Schweiz)": "ROG.SW",
+    "SAP (Deutschland)": "SAP.DE",
+    "Siemens (Deutschland)": "SIE.DE",
+    "Allianz (Deutschland)": "ALV.DE",
+    "Volkswagen Vz. (Deutschland)": "VOW3.DE",
+    "Mercedes-Benz (Deutschland)": "MBG.DE",
+    "BMW (Deutschland)": "BMW.DE",
+    
+    # --- ESG & Erneuerbare ---
+    "Verbund AG (Österreich)": "VER.VI",
+    "Ørsted (Dänemark)": "ORSTED.CO",
+    "Vestas Wind Systems": "VWS.CO",
+    "Infineon Technologies": "IFX.DE",
+    "Schneider Electric": "SU.PA",
+    "Erste Group Bank": "EBS.VI",
+    
+    # --- Österreich (ATX Ticker meist .VI für Vienna) ---
+    "OMV AG": "OMV.VI",
+    "voestalpine AG": "VOE.VI",
+    "Raiffeisen Bank Int.": "RBI.VI",
+    "Wienerberger AG": "WIE.VI",
+    "ANDRITZ AG": "ANDR.VI",
+    "BAWAG Group": "BG.VI",
+    "Österreichische Post": "POST.VI",
+    "Vienna Insurance Group": "VIG.VI",
 }
