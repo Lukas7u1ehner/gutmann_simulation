@@ -52,7 +52,10 @@ def render():
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Button zum Wechseln des Tabs
-    if st.button("➡️ Simulation starten", use_container_width=True, type="primary"):
+    # --- FIX FÜR DEN FEHLER ---
+    # Wir definieren eine Callback-Funktion. Diese wird ausgeführt, BEVOR Streamlit neu lädt.
+    def go_to_simulation():
         st.session_state.main_nav = "Simulation"
-        st.rerun()
+
+    # Wir nutzen 'on_click' um den State sicher zu ändern
+    st.button("➡️ Simulation starten", use_container_width=True, type="primary", on_click=go_to_simulation)
