@@ -32,50 +32,20 @@ def render():
     Rendert den gesamten Inhalt des 'Simulation' Tabs.
     """
     
-    # 1. GLOBALE EINGABEN
-    st.subheader("📋 Simulations-Parameter festlegen")
-
-    # Callbacks für Datum-Update
-    def update_start_date():
-        st.session_state.sim_start_date = st.session_state.widget_start_date
-    def update_end_date():
-        st.session_state.sim_end_date = st.session_state.widget_end_date
-
-    col1, col2, col3, col4 = st.columns([1.5, 1.5, 1, 1])
-    with col1:
-        st.date_input(
-            "Startdatum (Historie)", 
-            value=st.session_state.sim_start_date,
-            max_value=date.today(), 
-            key="widget_start_date",
-            on_change=update_start_date
-        )
-    with col2:
-        st.date_input(
-            "Enddatum (Historie)", 
-            value=st.session_state.sim_end_date,
-            max_value=date.today(), 
-            key="widget_end_date",
-            on_change=update_end_date
-        )
-    with col3:
-        st.session_state.inflation_slider = st.slider(
-            "Erw. Inflation p.a. (%)", 0.0, 10.0, 
-            value=st.session_state.inflation_slider, 
-            step=0.1
-        )
-    with col4:
-        st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-        with st.popover("💸 Kosten Einstellungen", use_container_width=True):
-            st.session_state.cost_ausgabe = st.number_input("Ausgabeaufschlag (%)", 0.0, 10.0, value=st.session_state.cost_ausgabe, step=0.1)
-            st.session_state.cost_management = st.number_input("Managementgebühr (% p.a.)", 0.0, 10.0, value=st.session_state.cost_management, step=0.01)
-            st.session_state.cost_depot = st.number_input("Depotgebühr (€ p.a.)", 0.0, value=st.session_state.cost_depot, step=1.0)
-
-    # Asset Handling
+    # --- 1. ASSET HANDLING (GANZ OBEN) ---
+    st.subheader("💰 Titel zum Portfolio hinzufügen")
+    
+    # Callback für Hinzufügen
     def handle_add_click():
         name_to_add = ""
         isin_to_add = ""
         is_valid = False
+        
+        # Werte aus dem Formular lesen
+        start_invest = st.session_state.widget_add_start
+        savings_rate = st.session_state.widget_add_savings
+        interval = st.session_state.widget_add_interval
+
         if st.session_state.katalog_auswahl != "Bitte wählen...":
             name_to_add = st.session_state.katalog_auswahl
             isin_to_add = KATALOG[st.session_state.katalog_auswahl]
@@ -93,15 +63,39 @@ def render():
             st.session_state.assets.append({
                 "Name": name_to_add,
                 "ISIN / Ticker": isin_to_add,
-                "Einmalerlag (€)": 1000.0,
-                "Sparbetrag (€)": 100.0,
-                "Spar-Intervall": "monatlich",
+                "Einmalerlag (€)": start_invest, 
+                "Sparbetrag (€)": savings_rate,
+                "Spar-Intervall": interval,
             })
-            st.toast(f"'{name_to_add}' hinzugefügt!", icon="✅")
+            st.toast(f"'{name_to_add}' erfolgreich hinzugefügt!", icon="✅")
+            # Reset der Inputs
             st.session_state.katalog_auswahl = "Bitte wählen..."
             st.session_state.manuelle_isin = ""
 
-    st.subheader("💰 Titel zum Portfolio hinzufügen")
+    # Formular - PLATZSPARENDES LAYOUT
+    with st.form(key="add_title_form", clear_on_submit=False):
+        
+        # Zeile 1: Katalog & ISIN - Nutzt 75% der Breite [1.5, 1.5, 1]
+        col_sel1, col_sel2, _ = st.columns([1.5, 1.5, 1])
+        with col_sel1:
+            st.selectbox("Titel aus Katalog wählen", KATALOG.keys(), key="katalog_auswahl")
+        with col_sel2:
+            st.text_input("Oder ISIN / Ticker manuell eingeben", key="manuelle_isin", placeholder="z.B. US0378331005")
+        
+        # Zeile 2: Beträge + Button in einer Reihe -> Sehr kompakt
+        col_val1, col_val2, col_val3, col_btn = st.columns([1, 1, 1, 1])
+        with col_val1:
+            st.number_input("Einmalerlag (€)", min_value=0.0, value=1000.0, step=100.0, key="widget_add_start")
+        with col_val2:
+            st.number_input("Sparrate (€)", min_value=0.0, value=100.0, step=10.0, key="widget_add_savings")
+        with col_val3:
+            st.selectbox("Intervall", ["monatlich", "vierteljährlich", "jährlich"], key="widget_add_interval")
+        with col_btn:
+            st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True) # Spacer zum Ausrichten
+            st.form_submit_button("Titel Hinzufügen", use_container_width=True, on_click=handle_add_click)
+
+    st.caption("💡 **Tipp:** Zum Löschen einer Position markieren Sie die Zeile links und drücken die **'Entf'-Taste** (Delete) auf Ihrer Tastatur.")
+
     edited_assets = st.data_editor(
         st.session_state.assets,
         num_rows="dynamic",
@@ -117,23 +111,36 @@ def render():
         key="portfolio_table_editor"
     )
     st.session_state.assets = edited_assets
+    
+    st.markdown('<div style="margin-bottom: 10px;"></div>', unsafe_allow_html=True)
 
-    with st.form(key="add_title_form", clear_on_submit=False):
-        kat_col1, kat_col2, kat_col3 = st.columns([2, 2, 1])
-        with kat_col1:
-            st.selectbox("Titel aus Katalog wählen", KATALOG.keys(), key="katalog_auswahl")
-        with kat_col2:
-            st.text_input("Oder ISIN / Ticker manuell eingeben", key="manuelle_isin")
-        with kat_col3:
-            st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-            st.form_submit_button("Hinzufügen", use_container_width=True, on_click=handle_add_click)
+    # --- 2. GLOBALE EINSTELLUNGEN (INFLATION & KOSTEN) ---
+    st.markdown("##### ⚙️ Globale Parameter")
+    
+    col_inf, col_cost, _ = st.columns([1, 1, 3])
+    
+    with col_inf:
+        st.session_state.inflation_slider = st.slider(
+            "Erw. Inflation p.a. (%)", 0.0, 10.0, 
+            value=st.session_state.inflation_slider, 
+            step=0.1
+        )
+        
+    with col_cost:
+        st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+        with st.popover("💸 Kosten Einstellungen", use_container_width=True):
+            st.session_state.cost_ausgabe = st.number_input("Ausgabeaufschlag (%)", 0.0, 10.0, value=st.session_state.cost_ausgabe, step=0.1)
+            st.session_state.cost_management = st.number_input("Managementgebühr (% p.a.)", 0.0, 10.0, value=st.session_state.cost_management, step=0.01)
+            st.session_state.cost_depot = st.number_input("Depotgebühr (€ p.a.)", 0.0, value=st.session_state.cost_depot, step=1.0)
 
-    # 2. AUTOMATISCHE BERECHNUNG (Historie)
+
+    # --- 3. AUTOMATISCHE BERECHNUNG (HISTORIE) ---
     simulation_successful = False
     assets_to_simulate = [asset for asset in st.session_state.assets if asset.get("ISIN / Ticker")]
     
     if assets_to_simulate:
         with st.spinner("Berechne Portfolio..."):
+             # Berechnung basiert auf den im State gespeicherten Datumswerten (für die History)
              sim_data, hist_returns, final_values = portfolio_logic.run_portfolio_simulation(
                 assets=assets_to_simulate,
                 start_date=st.session_state.sim_start_date,
@@ -157,7 +164,7 @@ def render():
         st.info("Bitte füge Titel zum Portfolio hinzu, um die Simulation zu starten.")
 
 
-    # 3. TOGGLE (Historie vs. Zukunft)
+    # --- 4. NAVIGATION TABS (Historie vs. Zukunft) ---
     st.markdown("---")
     
     if simulation_successful:
@@ -180,6 +187,39 @@ def render():
         # === SUB-TAB: HISTORISCHE SIMULATION ===
         if st.session_state.sim_sub_nav_state == "Historische Simulation":
             
+            st.markdown("##### 📅 Zeitraum für Historie")
+            
+            def update_start_date():
+                st.session_state.sim_start_date = st.session_state.widget_start_date
+            def update_end_date():
+                st.session_state.sim_end_date = st.session_state.widget_end_date
+
+            # Layout: [1, 1, 1, 3] -> Spalte 3 für den Toggle
+            d_col1, d_col2, d_col3, _ = st.columns([1, 1, 1, 3])
+            
+            with d_col1:
+                st.date_input(
+                    "Startdatum", 
+                    value=st.session_state.sim_start_date,
+                    min_value=date(1980, 1, 1), # Erlaubt Datum bis 2000 für Krisen-Analyse
+                    max_value=date.today(), 
+                    key="widget_start_date",
+                    on_change=update_start_date
+                )
+            with d_col2:
+                st.date_input(
+                    "Enddatum", 
+                    value=st.session_state.sim_end_date,
+                    max_value=date.today(), 
+                    key="widget_end_date",
+                    on_change=update_end_date
+                )
+            
+            # FEEDBACK-UMSETZUNG: Zurück zum Toggle (sieht besser aus)
+            with d_col3:
+                st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+                show_market_phases = st.toggle("📉 Marktphasen anzeigen", value=False)
+
             st.markdown("##### 📈 Berechnete Rendite p.a. (Historisch)")
             hist_returns = st.session_state.historical_returns_pa
             if hist_returns:
@@ -191,7 +231,12 @@ def render():
             st.subheader("Entwicklung in der Vergangenheit")
             chart_col, kpi_col = st.columns([3, 1])
             with chart_col:
-                fig = plotting.create_simulation_chart(st.session_state.simulations_daten, None, title="Historisches Portfolio") 
+                fig = plotting.create_simulation_chart(
+                    st.session_state.simulations_daten, 
+                    None, 
+                    title="Historisches Portfolio",
+                    show_crisis_events=show_market_phases
+                ) 
                 st.plotly_chart(fig, use_container_width=True)
             
             with kpi_col:
@@ -211,6 +256,12 @@ def render():
         # === SUB-TAB: ZUKUNFTSPROGNOSE ===
         elif st.session_state.sim_sub_nav_state == "Zukunftsprognose":
             
+            # Cleanup
+            current_active_names = [a.get("Name") for a in st.session_state.assets if a.get("Name")]
+            for existing_key in list(st.session_state.prognosis_assumptions_pa.keys()):
+                if existing_key not in current_active_names:
+                    del st.session_state.prognosis_assumptions_pa[existing_key]
+
             def update_assumption(asset_name):
                 val = st.session_state[f"assumption_{asset_name}"]
                 st.session_state.prognosis_assumptions_pa[asset_name] = val
@@ -220,12 +271,18 @@ def render():
 
             def run_prognose_logic():
                 current_assumptions = st.session_state.prognosis_assumptions_pa
-                last_row = st.session_state.simulations_daten.iloc[-1]
+                
+                # --- LOGIK: ZUKUNFT STARTET NEU (VON DER TABELLE) ---
+                start_capital_from_table = 0.0
+                for asset in st.session_state.assets:
+                    if asset.get("ISIN / Ticker"): # Nur valide Assets
+                        start_capital_from_table += asset.get("Einmalerlag (€)", 0.0)
+                
                 start_vals = {
-                    "letzter_tag": st.session_state.simulations_daten.index[-1],
-                    "nominal": last_row["Portfolio (nominal)"],
-                    "real": last_row["Portfolio (real)"],
-                    "einzahlung": last_row["Einzahlungen (brutto)"]
+                    "letzter_tag": date.today(), # Startdatum ist HEUTE
+                    "nominal": start_capital_from_table,
+                    "real": start_capital_from_table,
+                    "einzahlung": start_capital_from_table # Chart beginnt bei der Summe der Einmalerläge
                 }
                 
                 st.session_state.prognose_daten = prognose_logic.run_forecast(
@@ -245,17 +302,6 @@ def render():
 
             st.subheader("🔮 Prognose- & Monte-Carlo-Parameter")
             
-            # --- FIXE SETTINGS ---
-            st.markdown(f"""
-            <div class="fixed-settings-container">
-                <span class="fixed-label-main">⚙️ Fixe Einstellungen:</span>
-                <span class="fixed-val">Simulationen: <strong>{FIXED_N_SIMULATIONS}</strong></span>
-                <span class="fixed-val">Profil: <strong>{FIXED_RISK_PROFILE_KEY} ({FIXED_VOLATILITY}%)</strong></span>
-                <span class="fixed-val">Sparplan: <strong>{'Ja' if FIXED_SPARPLAN_ACTIVE else 'Nein'}</strong></span>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # --- VARIABLE SETTINGS ---
             var_col1, var_col2 = st.columns([1, 3])
             
             with var_col1:
@@ -274,20 +320,23 @@ def render():
                 st.markdown("**Erwartete Rendite (p.a.) je Titel**")
                 current_asset_names = list(st.session_state.prognosis_assumptions_pa.keys())
                 
-                cols_per_row = 3
-                grid_cols = st.columns(cols_per_row)
-                
-                for i, name in enumerate(current_asset_names):
-                    val = st.session_state.prognosis_assumptions_pa[name]
-                    with grid_cols[i % cols_per_row]:
-                        st.number_input(
-                            f"{name} (%)", 
-                            value=val, 
-                            key=f"assumption_{name}", 
-                            step=0.5,
-                            on_change=update_assumption,
-                            args=(name,)
-                        )
+                if current_asset_names:
+                    cols_per_row = 3
+                    grid_cols = st.columns(cols_per_row)
+                    
+                    for i, name in enumerate(current_asset_names):
+                        val = st.session_state.prognosis_assumptions_pa[name]
+                        with grid_cols[i % cols_per_row]:
+                            st.number_input(
+                                f"{name} (%)", 
+                                value=val, 
+                                key=f"assumption_{name}", 
+                                step=0.5,
+                                on_change=update_assumption,
+                                args=(name,)
+                            )
+                else:
+                    st.info("Keine aktiven Titel für die Prognose.")
 
             # Berechnung
             run_prognose_logic()
@@ -305,21 +354,49 @@ def render():
                         title="Prognostizierte Entwicklung (Monte Carlo)"
                     )
                     st.plotly_chart(fig_prog, use_container_width=True)
+                    
+                    # FEEDBACK-UMSETZUNG: Lesehilfe im Gutmann-Style (statt st.info)
+                    st.markdown(f"""
+                    <div style="background-color: {GUTMANN_SECONDARY_DARK}; padding: 15px; border-radius: 5px; border-left: 5px solid {GUTMANN_ACCENT_GREEN}; color: {GUTMANN_LIGHT_TEXT}; font-size: 0.95em;">
+                        <strong style="color: {GUTMANN_ACCENT_GREEN}; font-size: 1.05em;">ℹ️ Lesehilfe zur Grafik:</strong><br>
+                        <ul style="margin-top: 5px; padding-left: 20px; margin-bottom: 0;">
+                            <li>Das <b>Optimistische Szenario (95%)</b> zeigt eine Entwicklung, die statistisch nur in besonders guten Marktphasen erreicht wird.</li>
+                            <li>Das <b>Pessimistisches Szenario (5%)</b> markiert eine Entwicklung, die selbst in sehr schlechten Phasen nur selten unterschritten wird.</li>
+                            <li>Die <b style="color: #1E90FF;">Median-Linie (Blau)</b> ist das statistisch wahrscheinlichste Ergebnis (50/50 Chance).</li>
+                            <li><em style="color: cyan;">Hinweis:</em> Die Türkise Linie (Real) ist inflationsbereinigt.</li>
+                        </ul>
+                    </div>
+                    """, unsafe_allow_html=True)
 
                 with kpi_col:
                     st.markdown('<div style="margin-top: 25px;"></div>', unsafe_allow_html=True)
                     
+                    # Basis-Daten für KPIs
                     last_row_prog = st.session_state.prognose_daten.iloc[-1]
+                    
+                    # Startkapital aus der Tabelle (NICHT Historie)
+                    start_capital_planned = st.session_state.prognose_daten.iloc[0]["Einzahlungen (brutto)"]
                     
                     end_val_nom = last_row_prog["Portfolio (Median)"]
                     end_val_real = last_row_prog["Portfolio (Real_Median)"]
-                    total_invest = last_row_prog["Einzahlungen (brutto)"]
                     
-                    rendite_nom = ((end_val_nom / total_invest) - 1) * 100 if total_invest > 0 else 0
-                    rendite_real = ((end_val_real / total_invest) - 1) * 100 if total_invest > 0 else 0
-
-                    st.metric("Gesamteinzahlung (Prognose-Ende)", f"€ {total_invest:,.2f}")
-                    st.metric("Endkapital (nominal)", f"€ {end_val_nom:,.2f}")
-                    st.metric("Endkapital (real)", f"€ {end_val_real:,.2f}")
-                    st.metric("Rendite (nominal)", f"{rendite_nom:,.2f} %")
-                    st.metric("Rendite (real)", f"{rendite_real:,.2f} %")
+                    # Gesamtes eingezahltes Kapital am Ende der Laufzeit
+                    total_invest_end = last_row_prog["Einzahlungen (brutto)"]
+                    
+                    # Zukünftige Einzahlungen = Differenz aus End-Stand und Start-Stand
+                    future_savings_sum = total_invest_end - start_capital_planned
+                    
+                    # Rendite Berechnung
+                    rendite_nom = ((end_val_nom / total_invest_end) - 1) * 100 if total_invest_end > 0 else 0
+                    
+                    # --- KPI ANZEIGE ---
+                    
+                    st.metric("Startkapital (Geplant)", f"€ {start_capital_planned:,.2f}", help="Summe der Einmalerläge aus der Asset-Liste")
+                    
+                    st.metric("+ Zukünftige Sparraten", f"€ {future_savings_sum:,.2f}", help="Summe der Sparraten in der Prognose-Zeit")
+                    
+                    st.metric("Endkapital (Median, nom.)", f"€ {end_val_nom:,.2f}")
+                    
+                    st.metric("Rendite (auf Gesamt)", f"{rendite_nom:,.2f} %", help="Rendite bezogen auf Startkapital + Sparraten")
+                    
+                    st.metric("Endkapital (real)", f"€ {end_val_real:,.2f}", help="Kaufkraftbereinigt")

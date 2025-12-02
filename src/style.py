@@ -101,21 +101,28 @@ def apply_gutmann_style():
         color: {GUTMANN_LIGHT_TEXT};
     }}
 
+    /* --- FEEDBACK-ANPASSUNG: Button Kontrast & Sichtbarkeit --- */
     .stButton > button {{
-        background-color: {GUTMANN_ACCENT_GREEN};
-        color: {GUTMANN_DARK_GREEN};
+        background-color: {GUTMANN_ACCENT_GREEN} !important;
+        color: {GUTMANN_DARK_GREEN} !important;
         border-radius: 5px;
         border: none;
         padding: 10px 20px;
         font-weight: bold;
+        opacity: 1 !important; /* Verhindert ausgegrauten Look */
     }}
     .stButton > button:hover {{
         background-color: {GUTMANN_ACCENT_GREEN};
-        opacity: 0.9;
+        filter: brightness(110%);
+        color: {GUTMANN_DARK_GREEN} !important;
     }}
     .stButton > button:focus {{
         outline: none;
         box-shadow: 0 0 0 2px {GUTMANN_ACCENT_GREEN};
+        color: {GUTMANN_DARK_GREEN} !important;
+    }}
+    .stButton > button p {{
+        color: {GUTMANN_DARK_GREEN} !important;
     }}
 
     .stSelectbox > div > div, 

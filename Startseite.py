@@ -15,7 +15,7 @@ try:
     # Neue modulare Imports mit Tab_ Prefix
     from src import Tab_Startseite 
     from src import Tab_Simulation
-    from src import Tab_Marktanalyse
+    # Marktanalyse Import entfernt, da integriert
 
     apply_gutmann_style()
 
@@ -139,9 +139,8 @@ if "prognosis_assumptions_pa" not in st.session_state:
 
 
 # --- HAUPT-NAVIGATION ---
-# Dies steuert, welches Modul geladen wird
-# Reihenfolge angepasst: Startseite -> Simulation -> Marktanalyse
-st.radio(" ", options=["Startseite", "Simulation", "Marktanalyse"], key="main_nav", horizontal=True)
+# Feedback: Marktanalyse Tab entfernt, da nun integriert
+st.radio(" ", options=["Startseite", "Simulation"], key="main_nav", horizontal=True)
 
 
 # --- VIEW LOGIK (ROUTING) ---
@@ -150,6 +149,3 @@ if st.session_state.main_nav == "Startseite":
 
 elif st.session_state.main_nav == "Simulation":
     Tab_Simulation.render()
-
-elif st.session_state.main_nav == "Marktanalyse":
-    Tab_Marktanalyse.render()

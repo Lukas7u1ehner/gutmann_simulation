@@ -1,6 +1,7 @@
 import plotly.graph_objects as go
 import pandas as pd
 import streamlit as st
+import numpy as np
 
 try:
     from .style import (
@@ -16,17 +17,57 @@ except ImportError:
     GUTMANN_DARK_GREEN = "#25342F"
 
 # Farben für die Prognose-Bänder
-PROGNOSE_MEDIAN_COLOR = "#1E90FF"  # Kräftiges Blau für die Median-Linie
-PROGNOSE_REAL_MEDIAN_COLOR = "#00FFFF" # Cyan für die reale Median-Linie
-PROGNOSE_BEST_LINE_COLOR = "rgba(0, 200, 0, 1.0)"  # Deckend Grün
-PROGNOSE_WORST_LINE_COLOR = "rgba(200, 0, 0, 1.0)" # Deckend Rot
-PROGNOSE_EINZAHLUNG_COLOR = "#707070" # Dunkleres Grau
+PROGNOSE_MEDIAN_COLOR = "#1E90FF"
+PROGNOSE_REAL_MEDIAN_COLOR = "#00FFFF"
+PROGNOSE_BEST_LINE_COLOR = "rgba(0, 200, 0, 1.0)"
+PROGNOSE_WORST_LINE_COLOR = "rgba(200, 0, 0, 1.0)"
+PROGNOSE_EINZAHLUNG_COLOR = "#707070"
+
+# --- MARKT-PHASEN DATEN (Hierher verschoben & bereinigt) ---
+MARKET_PHASES = [
+    {
+        "label": "Dotcom-Blase",
+        "start": "2000-03-24",
+        "end": "2002-10-09",
+        "desc": "Platzen der Technologieblase. Der S&P 500 verlor ca. 49%.",
+        "color": "rgba(255, 0, 0, 0.1)"
+    },
+    {
+        "label": "Finanzkrise", # FEEDBACK: (GFC) entfernt
+        "start": "2007-10-09",
+        "end": "2009-03-09",
+        "desc": "Globale Finanzkrise ausgelöst durch den US-Hypothekenmarkt.",
+        "color": "rgba(255, 0, 0, 0.1)"
+    },
+    {
+        "label": "Euro-Krise & US-Downgrade",
+        "start": "2011-04-29",
+        "end": "2011-10-03",
+        "desc": "Staatsschuldenkrise in Europa und Herabstufung der US-Bonität.",
+        "color": "rgba(255, 165, 0, 0.1)"
+    },
+    {
+        "label": "Corona-Crash",
+        "start": "2020-02-19",
+        "end": "2020-03-23",
+        "desc": "Schnellster Bärenmarkt der Geschichte durch COVID-19.",
+        "color": "rgba(255, 0, 0, 0.1)"
+    },
+    {
+        "label": "Zinswende & Inflation",
+        "start": "2022-01-03",
+        "end": "2022-10-12",
+        "desc": "Hohe Inflation, Ukraine-Krieg und steigende Zinsen.",
+        "color": "rgba(255, 0, 0, 0.1)"
+    }
+]
 
 
 def create_simulation_chart(
     df_history: pd.DataFrame = None, 
     df_forecast: pd.DataFrame = None,
-    title: str = "Simulierte Portfolio-Entwicklung"
+    title: str = "Simulierte Portfolio-Entwicklung",
+    show_crisis_events: bool = False # Neuer Parameter für den Toggle
 ):
     fig = go.Figure()
 
@@ -39,7 +80,7 @@ def create_simulation_chart(
                 mode="lines",
                 name="Portfolio (nominal, historisch)",
                 line=dict(color=GUTMANN_ACCENT_GREEN, width=2.5),
-                hovertemplate='%{y:,.0f} €' # Kompaktes Hover
+                hovertemplate='%{y:,.0f} €'
             )
         )
         fig.add_trace(
@@ -65,6 +106,79 @@ def create_simulation_chart(
             )
         )
 
+        # --- MARKTANALYSE EVENTS (Nur für Historie relevant) ---
+        if show_crisis_events:
+            min_date = df_history.index.min()
+            max_date = df_history.index.max()
+
+            for phase in MARKET_PHASES:
+                p_start = pd.to_datetime(phase["start"])
+                p_end = pd.to_datetime(phase["end"])
+
+                # Check: Liegt die Phase (oder Teile davon) im sichtbaren Bereich?
+                if p_end >= min_date and p_start <= max_date:
+                    
+                    vis_start = max(min_date, p_start)
+                    vis_end = min(max_date, p_end)
+                    
+                    # 1. Visueller Bereich (Hintergrundfarbe)
+                    fig.add_vrect(
+                        x0=vis_start, x1=vis_end,
+                        fillcolor=phase["color"], opacity=1,
+                        layer="below", line_width=0,
+                    )
+
+                    # 2. Performance im Zeitraum berechnen
+                    try:
+                        # asof sucht den nächstgelegenen Wert, falls Datum fehlt (Wochenende)
+                        val_start = df_history["Portfolio (nominal)"].asof(vis_start)
+                        val_end = df_history["Portfolio (nominal)"].asof(vis_end)
+                        
+                        if pd.notna(val_start) and pd.notna(val_end) and val_start > 0:
+                            perf_pct = ((val_end / val_start) - 1) * 100
+                            perf_str = f"{perf_pct:+.2f} %"
+                        else:
+                            perf_str = "n/a"
+                    except:
+                        perf_str = "n/a"
+
+                    # 3. FEEDBACK-UMSETZUNG: Unsichtbare Linie für Hover im GESAMTEN Bereich
+                    # Wir erstellen ein DataFrame für diesen Zeitraum, um für jeden Tag einen Hover-Punkt zu haben
+                    mask = (df_history.index >= vis_start) & (df_history.index <= vis_end)
+                    df_phase = df_history.loc[mask]
+                    
+                    if not df_phase.empty:
+                        # Hover-Text für jeden Punkt in diesem Zeitraum
+                        hover_text = (
+                            f"<b>{phase['label']}</b><br>"
+                            f"📅 {phase['start']} bis {phase['end']}<br><br>"
+                            f"📉 <b>Portfolio-Rendite (Phase):</b> {perf_str}<br>"
+                            f"ℹ️ <i>{phase['desc']}</i>"
+                        )
+                        
+                        # Unsichtbare Linie (opacity=0), die aber Hover-Events fängt
+                        fig.add_trace(go.Scatter(
+                            x=df_phase.index,
+                            y=df_phase["Portfolio (nominal)"], # Folgt der Portfolio-Linie
+                            mode="lines",
+                            line=dict(width=0), # Unsichtbar
+                            name=phase['label'],
+                            showlegend=False,
+                            hoverinfo="text",
+                            hovertext=[hover_text] * len(df_phase),
+                            hoverlabel=dict(bgcolor="white", font_size=12)
+                        ))
+                    
+                    # Label oben am Rand zur Orientierung
+                    mid_date = vis_start + (vis_end - vis_start) / 2
+                    fig.add_annotation(
+                        x=mid_date, y=1.02, yref="paper",
+                        text=f"<b>{phase['label']}</b>",
+                        showarrow=False,
+                        font=dict(size=10, color="#555")
+                    )
+
+
     # --- 2. PROGNOSE-DATEN ---
     if df_forecast is not None and not df_forecast.empty:
         
@@ -88,10 +202,9 @@ def create_simulation_chart(
                 x=df_forecast.index,
                 y=df_forecast["Portfolio (BestCase)"],
                 mode="lines",
-                name="Best Case (95%)",
+                name="Optimistisches Szenario (95%)",
                 line=dict(color=PROGNOSE_BEST_LINE_COLOR, width=2.0, dash="dot"),
-                fill=None,
-                hovertemplate='<b>Best (95%):</b> %{y:,.0f} €<extra></extra>'
+                hovertemplate='<b>Optimistisch:</b> %{y:,.0f} €<extra></extra>'
             )
         )
         fig.add_trace(
@@ -99,10 +212,9 @@ def create_simulation_chart(
                 x=df_forecast.index,
                 y=df_forecast["Portfolio (WorstCase)"],
                 mode="lines",
-                name="Worst Case (5%)",
+                name="Pessimistisch (5%, nominal)",
                 line=dict(color=PROGNOSE_WORST_LINE_COLOR, width=2.0, dash="dot"),
-                fill=None,
-                hovertemplate='<b>Worst (5%):</b> %{y:,.0f} €<extra></extra>'
+                hovertemplate='<b>Pessimistisch:</b> %{y:,.0f} €<extra></extra>'
             )
         )
         
@@ -126,11 +238,11 @@ def create_simulation_chart(
                 x=df_forecast.index,
                 y=df_forecast["Einzahlungen (brutto)"],
             mode="lines",
-            name="Einzahlungen (brutto, prognose)",
+            name="Investiertes Kapital (Plan)",
             line=dict(
                 color=PROGNOSE_EINZAHLUNG_COLOR, width=2.5, dash="dash"
             ),
-            hovertemplate='<b>Invest:</b> %{y:,.0f} €<extra></extra>'
+            hovertemplate='<b>Gesamtkapital:</b> %{y:,.0f} €<extra></extra>'
         )
         )
 
@@ -138,15 +250,11 @@ def create_simulation_chart(
     fig.update_layout(
         title_text=title,
         title_font_color='#000000', 
-        # ACHSEN-BESCHRIFTUNGEN ANGEPASST
         xaxis_title="Zeitverlauf",
         yaxis_title="Portfolio-Wert (in €)",
         xaxis_title_font_color='#000000', 
         yaxis_title_font_color='#000000',
-        
-        hovermode="x unified", # Gemeinsamer Tooltip
-        
-        # Legende oben links
+        hovermode="x unified",
         legend=dict(
             yanchor="top", y=0.99, xanchor="left", x=0.01, 
             font_color='#000000',
@@ -156,15 +264,12 @@ def create_simulation_chart(
         paper_bgcolor='white', 
         font_color='#000000', 
         height=600,
-        
-        # Hover-Label Styling (Kompakt)
         hoverlabel=dict(
             bgcolor="white",
             font_size=12,
             font_family="Arial",
-            font_color="black" # ZUSÄTZLICHE SICHERHEIT
+            font_color="black"
         ),
-
         xaxis=dict(
             showgrid=True,
             gridcolor='#e0e0e0',
@@ -173,7 +278,7 @@ def create_simulation_chart(
             linewidth=2,
             zeroline=True,
             zerolinecolor='#c0c0c0',
-            tickfont=dict(color='#000000', size=12), # Schrift schwarz erzwungen
+            tickfont=dict(color='#000000', size=12),
             title_font=dict(color='#000000', size=14)
         ),
         yaxis=dict(
@@ -184,7 +289,7 @@ def create_simulation_chart(
             linewidth=2,
             zeroline=True,
             zerolinecolor='#c0c0c0',
-            tickfont=dict(color='#000000', size=12), # Schrift schwarz erzwungen
+            tickfont=dict(color='#000000', size=12),
             title_font=dict(color='#000000', size=14),
             tickformat="s" 
         ),
