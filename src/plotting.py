@@ -23,7 +23,7 @@ PROGNOSE_BEST_LINE_COLOR = "rgba(0, 200, 0, 1.0)"
 PROGNOSE_WORST_LINE_COLOR = "rgba(200, 0, 0, 1.0)"
 PROGNOSE_EINZAHLUNG_COLOR = "#707070"
 
-# --- MARKT-PHASEN DATEN (Hierher verschoben & bereinigt) ---
+# --- MARKT-PHASEN DATEN (Erweitert bis 1980) ---
 MARKET_PHASES = [
     {
         "label": "Dotcom-Blase",
@@ -33,31 +33,53 @@ MARKET_PHASES = [
         "color": "rgba(255, 0, 0, 0.1)"
     },
     {
-        "label": "Finanzkrise", # FEEDBACK: (GFC) entfernt
+        "label": "Finanzkrise",
         "start": "2007-10-09",
         "end": "2009-03-09",
-        "desc": "Globale Finanzkrise ausgelöst durch den US-Hypothekenmarkt.",
+        "desc": "Globale Finanzkrise ausgelöst durch den US-Hypothekenmarkt. Rückgang ca. 57%.",
         "color": "rgba(255, 0, 0, 0.1)"
     },
     {
         "label": "Euro-Krise & US-Downgrade",
         "start": "2011-04-29",
         "end": "2011-10-03",
-        "desc": "Staatsschuldenkrise in Europa und Herabstufung der US-Bonität.",
+        "desc": "Staatsschuldenkrise in Europa und Herabstufung der US-Bonität. Rückgang ca. 19%.",
         "color": "rgba(255, 165, 0, 0.1)"
     },
     {
         "label": "Corona-Crash",
         "start": "2020-02-19",
         "end": "2020-03-23",
-        "desc": "Schnellster Bärenmarkt der Geschichte durch COVID-19.",
+        "desc": "Schnellster Bärenmarkt der Geschichte durch COVID-19. Rückgang ca. 34%.",
         "color": "rgba(255, 0, 0, 0.1)"
     },
     {
         "label": "Zinswende & Inflation",
         "start": "2022-01-03",
         "end": "2022-10-12",
-        "desc": "Hohe Inflation, Ukraine-Krieg und steigende Zinsen.",
+        "desc": "Hohe Inflation, Ukraine-Krieg und steigende Zinsen. Rückgang ca. 25%.",
+        "color": "rgba(255, 0, 0, 0.1)"
+    },
+    # --- NEUE HISTORISCHE PHASEN (1980-2000) ---
+    {
+        "label": "Russlandkrise & LTCM",
+        "start": "1998-07-17",
+        "end": "1998-10-08",
+        "desc": "Zahlungsausfall Russlands und Beinahe-Kollaps des Hedgefonds LTCM. Rückgang ca. 19%.",
+        "color": "rgba(255, 165, 0, 0.1)" # Orange (Korrektur)
+    },
+    {
+        "label": "Golfkrieg & Rezession",
+        "start": "1990-07-16",
+        "end": "1990-10-11",
+        "desc": "Ölpreisschock durch Invasion Kuwaits und folgende US-Rezession. Rückgang ca. 20%.",
+        "color": "rgba(255, 165, 0, 0.1)"
+    },
+    {
+        "label": "Schwarzer Montag",
+        "start": "1987-08-25",
+        "end": "1987-12-04",
+        "desc": "Größter Tagesverlust der Geschichte (-22,6% am 19. Okt). Program Trading verschärfte den Crash. Gesamtrückgang ca. 34%.",
         "color": "rgba(255, 0, 0, 0.1)"
     }
 ]
@@ -67,7 +89,7 @@ def create_simulation_chart(
     df_history: pd.DataFrame = None, 
     df_forecast: pd.DataFrame = None,
     title: str = "Simulierte Portfolio-Entwicklung",
-    show_crisis_events: bool = False # Neuer Parameter für den Toggle
+    show_crisis_events: bool = False
 ):
     fig = go.Figure()
 
@@ -142,7 +164,7 @@ def create_simulation_chart(
                     except:
                         perf_str = "n/a"
 
-                    # 3. FEEDBACK-UMSETZUNG: Unsichtbare Linie für Hover im GESAMTEN Bereich
+                    # 3. Unsichtbare Linie für Hover im GESAMTEN Bereich
                     # Wir erstellen ein DataFrame für diesen Zeitraum, um für jeden Tag einen Hover-Punkt zu haben
                     mask = (df_history.index >= vis_start) & (df_history.index <= vis_end)
                     df_phase = df_history.loc[mask]
@@ -212,7 +234,7 @@ def create_simulation_chart(
                 x=df_forecast.index,
                 y=df_forecast["Portfolio (WorstCase)"],
                 mode="lines",
-                name="Pessimistisch (5%, nominal)",
+                name="Pessimistisches Szenario (5%)",
                 line=dict(color=PROGNOSE_WORST_LINE_COLOR, width=2.0, dash="dot"),
                 hovertemplate='<b>Pessimistisch:</b> %{y:,.0f} €<extra></extra>'
             )
@@ -224,7 +246,7 @@ def create_simulation_chart(
                 x=df_forecast.index,
                 y=df_forecast["Portfolio (Real_Median)"],
                 mode="lines",
-                name="Prognose Median (real)",
+                name="Prognose Median (real, kaufkraftber.)",
                 line=dict(
                     color=PROGNOSE_REAL_MEDIAN_COLOR, width=2, dash="dot"
                 ),
