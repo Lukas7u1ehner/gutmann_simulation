@@ -2,8 +2,7 @@ import yfinance as yf
 import pandas as pd
 from datetime import date, timedelta
 import streamlit as st
-import numpy as np  # Importiere numpy für die Faktorberechnung
-
+import numpy as np
 
 @st.cache_data
 def load_data(isin: str, start_date: date, end_date: date) -> pd.DataFrame | None:
@@ -45,19 +44,18 @@ def load_data(isin: str, start_date: date, end_date: date) -> pd.DataFrame | Non
         return None
 
 
-# (UPDATE) Funktion zur Validierung UND zum Abrufen des Namens
 @st.cache_data
 def validate_and_get_info(ticker: str) -> (bool, str | None):
     """
     Prüft, ob ein Ticker gültig ist und holt den Namen.
-    (NEU) Gibt (True, "Ticker Name") oder (False, "Genaue Fehlermeldung") zurück.
+    Gibt (True, "Ticker Name") oder (False, "Fehlermeldung") zurück.
     """
     if not ticker:
         return (False, "Kein Ticker/ISIN angegeben.")
     try:
         ticker_obj = yf.Ticker(ticker)
         
-        # (DEBUG) Versuche, .info abzurufen. Dies schlägt bei ISINs oft fehl.
+        # (DEBUG) Versuche, .info abzurufen.
         info = ticker_obj.info
 
         # (DEBUG) Prüfe, ob .history() leer ist.
@@ -78,49 +76,44 @@ def validate_and_get_info(ticker: str) -> (bool, str | None):
         return (True, name)
 
     except Exception as e:
-        # (DEBUG) Gib die genaue yfinance-Exception zurück
         print(f"Validierungs-Exception für {ticker}: {e}")
-        # Gib die Fehlermeldung als String zurück, damit sie im Frontend angezeigt werden kann
         return (False, f"yfinance Exception: {e}")
 
 
-# Caching für die Berechnungs-Funktion
 @st.cache_data
 def run_simulation(
     data: pd.DataFrame,
     periodic_investment: float,
     lump_sum: float,
     interval: str,
-    inflation_rate_pa: float,
+    # GEÄNDERT: Akzeptiert jetzt float (Prognose) ODER Series (Historie)
+    inflation_input: float | pd.Series,
     ausgabeaufschlag_pct: float,
     managementgebuehr_pa_pct: float,
 ) -> pd.DataFrame:
     """
-    Führt eine Sparplan-Simulation durch,
-    basierend auf Einmalerlag, variablem Sparintervall, Inflation und Kosten.
+    Führt eine Sparplan-Simulation durch.
+    inflation_input: Entweder ein Float (p.a. %) für Prognosen
+                     ODER eine pd.Series (Index=Date, Value=Factor) für exakte Historie.
     """
 
     # --- 1. KOSTENFAKTOREN ---
-    # Ausgabeaufschlag (einmalig bei Kauf)
     cost_factor = 1.0 - (ausgabeaufschlag_pct / 100.0)
-
-    # TÄGLICHER Inflationsfaktor
-    daily_inflation_factor = (1.0 + (inflation_rate_pa / 100.0)) ** (1 / 365.0)
 
     # TÄGLICHER Managementgebühr-Faktor
     daily_mgmt_fee_factor = (1.0 - (managementgebuehr_pa_pct / 100.0)) ** (1 / 365.0)
 
     # --- 2. INTERVALL-LOGIK ---
     if interval == "monatlich":
-        resample_code = "MS"  # 'Month Start'
+        resample_code = "MS"
     elif interval == "vierteljährlich":
-        resample_code = "QS"  # 'Quarter Start'
+        resample_code = "QS"
     elif interval == "jährlich":
-        resample_code = "YS"  # 'Year Start'
+        resample_code = "YS"
     else:
-        resample_code = "MS"  # Fallback
+        resample_code = "MS"
 
-    # --- DATEN VORBEREITUNG (Fix für Lücken und Spikes) ---
+    # --- DATEN VORBEREITUNG ---
     full_date_range = pd.date_range(
         start=data.index.min(), end=data.index.max(), freq="D"
     )
@@ -129,7 +122,7 @@ def run_simulation(
     data = data.dropna(subset=["Close"])
 
     if data.empty:
-        return pd.DataFrame()  # Frühzeitiger Abbruch
+        return pd.DataFrame()
 
     # 3. Erstelle die periodischen Daten (Zeitpunkte der Sparrate)
     periodic_data = data.resample(resample_code).first()
@@ -140,19 +133,14 @@ def run_simulation(
     periodic_data["Investment"] = periodic_investment
     periodic_data["NetInvestment"] = periodic_data["Investment"] * cost_factor
 
-    # 4. Berechne die laufenden Käufe (OHNE Einmalerlag)
+    # 4. Berechne die laufenden Käufe
     periodic_data["Shares_Bought"] = 0.0
-    
-    # 4a. TotalInvestment_Periodic enthält die Brutto-Einzahlung des Sparplans
     periodic_data["TotalInvestment_Periodic"] = 0.0
-    
-    # (FIX) Initialisiere die 'TotalShares_Periodic' Spalte VOR der Schleife
     periodic_data["TotalShares_Periodic"] = 0.0
     
     for i in range(len(periodic_data)):
         current_price = periodic_data.iloc[i]["Price"]
 
-        # Die erste Rate (i=0) ist 0, die Sparplan-Zahlung beginnt erst danach
         if i == 0:
             net_inv = 0.0
             gross_inv = 0.0
@@ -167,7 +155,6 @@ def run_simulation(
 
         periodic_data.iloc[i, periodic_data.columns.get_loc("Shares_Bought")] = shares_bought
 
-        # Kumuliere die Brutto-Einzahlungen des Sparplans
         if i == 0:
             periodic_data.iloc[i, periodic_data.columns.get_loc("TotalInvestment_Periodic")] = 0.0
             periodic_data.iloc[i, periodic_data.columns.get_loc("TotalShares_Periodic")] = 0.0
@@ -178,7 +165,6 @@ def run_simulation(
     # --- 5. ÜBERTRAGUNG AUF TÄGLICHE BASIS ---
     daily_data_with_portfolio = data.copy()
 
-    # Füge den laufenden Anteilsbesitz (periodic) und den Brutto-Einzahlungsstand hinzu
     daily_data_with_portfolio = pd.merge_asof(
         daily_data_with_portfolio,
         periodic_data[["TotalShares_Periodic", "TotalInvestment_Periodic"]],
@@ -187,7 +173,6 @@ def run_simulation(
         direction="backward",
     )
 
-    # Fülle NaNs am Anfang mit 0
     daily_data_with_portfolio["TotalShares_Periodic"] = daily_data_with_portfolio["TotalShares_Periodic"].fillna(0)
     daily_data_with_portfolio["TotalInvestment_Periodic"] = daily_data_with_portfolio["TotalInvestment_Periodic"].fillna(0)
 
@@ -200,19 +185,15 @@ def run_simulation(
         if first_day_price > 0:
             lump_sum_shares = net_lump_sum / first_day_price
 
-    # Die Gesamtanteile sind die Summe aus Einmalerlag-Anteilen (konstant) und periodischen Anteilen
     daily_data_with_portfolio["TotalShares"] = daily_data_with_portfolio["TotalShares_Periodic"] + lump_sum_shares
-
-    # --- (FIX) Korrekte Berechnung der Gesamteinzahlung (Brutto) ---
-    # Die Brutto-Einzahlung ist die konstante Einmalzahlung + die kumulierte Sparrate
     daily_data_with_portfolio["TotalInvestment"] = daily_data_with_portfolio["TotalInvestment_Periodic"] + lump_sum
     
-    # --- 7. BERECHNE FINALEN WERT & WENDE GEBÜHREN AN ---
+    # --- 7. BERECHNE FINALEN WERT & GEBÜHREN ---
 
-    # 7a. Berechne den TÄGLICHEN Portfolio-Wert (Nominal, vor Managementgebühr)
+    # 7a. Nominalwert
     daily_data_with_portfolio["Portfolio (nominal)"] = daily_data_with_portfolio["TotalShares"] * daily_data_with_portfolio["Close"]
 
-    # 7b. Wende den täglichen Managementgebühr-Abzug an (kumulativ)
+    # 7b. Managementgebühr
     mgmt_fee_series = pd.Series(
         daily_mgmt_fee_factor, index=daily_data_with_portfolio.index
     ).cumprod()
@@ -220,15 +201,23 @@ def run_simulation(
         daily_data_with_portfolio["Portfolio (nominal)"] * mgmt_fee_series
     )
 
-    # 7c. Berechne die Inflation und den realen Wert
-    inflation_series = pd.Series(
-        daily_inflation_factor, index=daily_data_with_portfolio.index
-    ).cumprod()
+    # 7c. Inflation / Realwert (NEU ANGEPASST)
+    if isinstance(inflation_input, pd.Series):
+        # Fall A: Historische Zeitreihe übergeben -> Reindex auf Daten-Index
+        # ffill füllt Lücken (z.B. Wochenenden), fillna(1.0) für Startwerte
+        inflation_series = inflation_input.reindex(daily_data_with_portfolio.index, method='ffill').fillna(1.0)
+    else:
+        # Fall B: Fixer Float Wert (Prognose) -> Alte Berechnung
+        daily_inflation_factor = (1.0 + (inflation_input / 100.0)) ** (1 / 365.0)
+        inflation_series = pd.Series(
+            daily_inflation_factor, index=daily_data_with_portfolio.index
+        ).cumprod()
+
     daily_data_with_portfolio["Portfolio (real)"] = (
         daily_data_with_portfolio["Portfolio (nominal)"] / inflation_series
     )
 
-    # 8. Finales DataFrame mit TÄGLICHEN Werten zurückgeben
+    # 8. Rückgabe
     final_daily_df = daily_data_with_portfolio[
         ["TotalInvestment", "Portfolio (nominal)", "Portfolio (real)"]
     ].copy()

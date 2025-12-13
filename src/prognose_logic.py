@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 from datetime import timedelta, date
 
+from . import inflation  # NEU: Import der zentralen Inflations-Logik
+
 @staticmethod
 def _calculate_total_periodic_investment(assets: list[dict], interval: str) -> float:
     total = 0
@@ -27,11 +29,10 @@ def run_forecast(
     sparplan_fortfuehren: bool,
     kosten_management_pa_pct: float,
     kosten_depot_pa_eur: float,
-    inflation_rate_pa: float,
+    # inflation_rate_pa: float,  <-- ENTFERNT! Wir nutzen jetzt das Modul.
     ausgabeaufschlag_pct: float,
     expected_asset_returns_pa: dict[str, float],
     asset_final_values: dict[str, float],
-    # --- NEUE MONTE CARLO PARAMETER ---
     expected_volatility_pa: float,
     n_simulations: int
 ) -> pd.DataFrame | None:
@@ -49,17 +50,12 @@ def run_forecast(
             asset_return_assumption = expected_asset_returns_pa.get(asset_name, 0.0)
             weighted_avg_return_pa += weight * asset_return_assumption
     
-    # --- 2. Tägliche stochastische Parameter (Mu und Sigma) ---
-    # Wir verwenden 365.25 Tage für Konsistenz mit der Zinsrechnung
+    # --- 2. Tägliche stochastische Parameter ---
     trading_days = 365.25
-    
-    # Täglicher Erwartungswert (Mu)
     daily_mu = (weighted_avg_return_pa / 100.0) / trading_days
-    
-    # Tägliche Volatilität (Sigma)
     daily_sigma = (expected_volatility_pa / 100.0) / np.sqrt(trading_days)
 
-    # --- 3. Startwerte & Zeitrahmen für Prognose ---
+    # --- 3. Zeitrahmen ---
     letzter_tag_hist = start_values['letzter_tag']
     letzter_wert_nominal = start_values['nominal']
     letzter_wert_real_basis = start_values['real']
@@ -76,19 +72,25 @@ def run_forecast(
 
     prognose_df = pd.DataFrame(index=prognose_zeitraum)
 
-    # --- 4. Tägliche deterministische Faktoren (Kosten, Inflation, Sparplan) ---
-    daily_inflation_factor = (1.0 + (inflation_rate_pa / 100.0)) ** (1 / trading_days)
-    daily_mgmt_fee_factor = (1.0 - (kosten_management_pa_pct / 100.0)) ** (1 / trading_days)
-    cost_factor_sparrate = (1.0 - (ausgabeaufschlag_pct / 100.0))
+    # --- 4. Deterministische Faktoren ---
     
-    # Inflationsfaktor-Basis
-    prognose_df['Inflation_Factor'] = pd.Series(daily_inflation_factor, index=prognose_df.index).cumprod()
+    # A) INFLATION (NEU via Modul)
+    # Holt sich die Kurve (2025=4%, 2026+=2% etc.)
+    inflation_series = inflation.calculate_inflation_series(prognose_zeitraum)
+    
+    # Anpassung an Basis (falls Simulation nahtlos fortgesetzt wird)
     inflation_basis = 1.0
     if letzter_wert_real_basis > 0:
         inflation_basis = letzter_wert_nominal / letzter_wert_real_basis
-    prognose_df['Inflation_Factor'] *= inflation_basis
+    
+    # Zuweisung ins DataFrame
+    prognose_df['Inflation_Factor'] = inflation_series * inflation_basis
 
-    # Sparpläne
+    # B) KOSTEN
+    daily_mgmt_fee_factor = (1.0 - (kosten_management_pa_pct / 100.0)) ** (1 / trading_days)
+    cost_factor_sparrate = (1.0 - (ausgabeaufschlag_pct / 100.0))
+
+    # C) Sparpläne
     prognose_df['Sparrate_Einzahlung'] = 0.0
     prognose_df['Sparrate_Netto'] = 0.0
     
@@ -103,68 +105,43 @@ def run_forecast(
                 prognose_df.loc[spartage_im_index, 'Sparrate_Einzahlung'] = total_periodic
                 prognose_df.loc[spartage_im_index, 'Sparrate_Netto'] = total_periodic * cost_factor_sparrate
     
-    # Depotgebühr-Tage
     depotgebuehr_tage = prognose_df.resample('YS').first().index.intersection(prognose_df.index)
-    
-    # Kumulierte Einzahlungen (deterministisch)
     prognose_df['Einzahlungen (brutto)'] = prognose_df['Sparrate_Einzahlung'].cumsum() + letzte_einzahlung
 
-    # --- 5. Monte Carlo Simulation (Vektorisiert pro Tag) ---
-    
-    # Erstelle eine (Tage x Simulationen) Matrix für alle zufälligen Renditen
-    # (Geometrische Brownsche Bewegung: Rendite = mu*dt + sigma*sqrt(dt)*W(t))
-    # W(t) ist np.random.normal(0, 1)
-    # Wir vereinfachen dt zu 1 (da wir tägliche Mu/Sigma haben)
+    # --- 5. Monte Carlo Simulation ---
     random_returns = np.random.normal(
         loc=daily_mu, 
         scale=daily_sigma, 
         size=(num_days, n_simulations)
     )
     
-    # Matrix zur Speicherung aller Simulationswerte
     sim_matrix = np.zeros((num_days, n_simulations))
-    # Erster Tag ist der Startwert
     sim_matrix[0] = letzter_wert_nominal 
     
-    # Hole Vektoren für Sparplan und Depotgebühr
     sparrate_netto_vektor = prognose_df['Sparrate_Netto'].values
     depotgebuehr_vektor = np.zeros(num_days)
     depotgebuehr_indices = [prognose_df.index.get_loc(tag) for tag in depotgebuehr_tage if tag in prognose_df.index]
     if depotgebuehr_indices:
         depotgebuehr_vektor[depotgebuehr_indices] = kosten_depot_pa_eur
 
-    # Tägliche Schleife (simuliert alle N Simulationen auf einmal)
     for i in range(1, num_days):
         prev_values = sim_matrix[i-1]
-        
-        # 1. Wertsteigerung (stochastisch)
         current_values = prev_values * (1 + random_returns[i])
-        
-        # 2. Sparplan-Einzahlung (deterministisch)
         current_values += sparrate_netto_vektor[i]
-        
-        # 3. Kosten (deterministisch)
         current_values *= daily_mgmt_fee_factor
         current_values -= depotgebuehr_vektor[i]
-        
-        # 4. Clipping auf 0
         current_values = np.maximum(0, current_values)
-        
         sim_matrix[i] = current_values
 
-    # --- 6. Aggregation der Ergebnisse ---
-    
-    # Berechne Quantile entlang der Simulations-Achse (axis=1)
+    # --- 6. Aggregation ---
     prognose_df['Portfolio (Median)'] = np.quantile(sim_matrix, 0.50, axis=1)
     prognose_df['Portfolio (BestCase)'] = np.quantile(sim_matrix, 0.95, axis=1)
     prognose_df['Portfolio (WorstCase)'] = np.quantile(sim_matrix, 0.05, axis=1)
     
-    # Berechne reale (inflationsbereinigte) Werte
     prognose_df['Portfolio (Real_Median)'] = prognose_df['Portfolio (Median)'] / prognose_df['Inflation_Factor']
     prognose_df['Portfolio (Real_BestCase)'] = prognose_df['Portfolio (BestCase)'] / prognose_df['Inflation_Factor']
     prognose_df['Portfolio (Real_WorstCase)'] = prognose_df['Portfolio (WorstCase)'] / prognose_df['Inflation_Factor']
 
-    # Wähle die finalen Spalten aus
     final_columns = [
         'Einzahlungen (brutto)',
         'Portfolio (Median)',
