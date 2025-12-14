@@ -193,28 +193,45 @@ def render():
         )
         
         # --- PDF REPORT LOGIK ---
+        # --- PDF REPORT LOGIK ---
         def show_pdf_download_button(key_suffix):
-            # Prüfen ob Daten da sind
+            # Prüfen ob überhaupt Daten da sind
             if st.session_state.simulations_daten is None:
                 return
 
-            # Wir bauen die KPIs für den Report zusammen
+            # A) KPIs für Historie sammeln
             hist_kpis_dict = {}
             if st.session_state.simulations_daten is not None:
                 last_row = st.session_state.simulations_daten.iloc[-1]
+                total_invest = last_row['Einzahlungen (brutto)']
+                end_val = last_row['Portfolio (nominal)']
+                profit = end_val - total_invest
+                rendite_abs = (profit / total_invest * 100) if total_invest > 0 else 0
+                
+                # Dictionary für die PDF-Tabelle
                 hist_kpis_dict = {
-                    "Gesamteinzahlung": f"EUR {last_row['Einzahlungen (brutto)']:,.2f}",
-                    "Endkapital (nominal)": f"EUR {last_row['Portfolio (nominal)']:,.2f}",
+                    "Gesamteinzahlung": f"EUR {total_invest:,.2f}",
+                    "Endkapital (nominal)": f"EUR {end_val:,.2f}",
+                    "Gewinn/Verlust": f"EUR {profit:,.2f}",
+                    "Rendite (absolut)": f"{rendite_abs:.2f} %",
                     "Endkapital (real)": f"EUR {last_row['Portfolio (real)']:,.2f}"
                 }
 
+            # B) KPIs für Prognose sammeln (nur wenn vorhanden!)
             prog_kpis_dict = {}
             if st.session_state.prognose_daten is not None:
                 last_row_p = st.session_state.prognose_daten.iloc[-1]
+                start_cap = st.session_state.prognose_daten.iloc[0]['Einzahlungen (brutto)']
+                end_median = last_row_p['Portfolio (Median)']
+                # Rendite auf Gesamtinvest
+                rendite_prog = ((end_median / last_row_p['Einzahlungen (brutto)']) - 1) * 100
+                
                 prog_kpis_dict = {
-                    "Investiertes Kapital (Plan)": f"EUR {last_row_p['Einzahlungen (brutto)']:,.2f}",
-                    "Endkapital (Median, nom.)": f"EUR {last_row_p['Portfolio (Median)']:,.2f}",
-                    "Endkapital (Median, real)": f"EUR {last_row_p['Portfolio (Real_Median)']:,.2f}"
+                    "Startkapital (Ist-Stand)": f"EUR {start_cap:,.2f}",
+                    "Geplante Sparraten (Summe)": f"EUR {(last_row_p['Einzahlungen (brutto)'] - start_cap):,.2f}",
+                    "Endkapital (Median, nominal)": f"EUR {end_median:,.2f}",
+                    "Rendite Erwartungswert": f"{rendite_prog:.2f} %",
+                    "Endkapital (Real, Median)": f"EUR {last_row_p['Portfolio (Real_Median)']:,.2f}"
                 }
             
             # Globale Params für Seite 1
@@ -225,21 +242,18 @@ def render():
                 "Depotgebühr": f"{st.session_state.cost_depot} EUR p.a."
             }
 
-            # Button Logik: Erst generieren, dann Download anbieten
-            if st.button("📄 PDF Report erstellen", key=f"btn_gen_pdf_{key_suffix}", use_container_width=True):
-                with st.spinner("Erstelle PDF Report... Charts werden gerendert..."):
-                    # Charts neu erstellen (oder holen wenn in Session State gespeichert wäre)
-                    # Achtung: plotting.create_simulation_chart gibt eine Figure zurück
-                    
-                    # 1. Historie Chart
+            # Button
+            if st.button("PDF Report erstellen", key=f"btn_gen_pdf_{key_suffix}", use_container_width=True):
+                with st.spinner("Erstelle PDF Report..."):
+                    # 1. Historie Chart neu erstellen (für sauberen Look)
                     fig_hist = plotting.create_simulation_chart(
                         st.session_state.simulations_daten, 
                         None, 
                         title="Historische Entwicklung",
-                        show_crisis_events=False # Clean für Report
+                        show_crisis_events=False
                     )
                     
-                    # 2. Prognose Chart (nur wenn Daten da sind)
+                    # 2. Prognose Chart neu erstellen (nur wenn Daten da)
                     fig_prog = None
                     if st.session_state.prognose_daten is not None:
                         fig_prog = plotting.create_simulation_chart(
@@ -257,12 +271,11 @@ def render():
                             prog_fig=fig_prog,
                             prog_kpis=prog_kpis_dict
                         )
-                        # PDF in Session State speichern, damit der Download Button erscheint
                         st.session_state[f"pdf_data_{key_suffix}"] = pdf_bytes
                     except Exception as e:
-                        st.error(f"Fehler bei der PDF-Erstellung: {e}. Ist 'kaleido' installiert?")
+                        st.error(f"Fehler bei der PDF-Erstellung: {e}")
             
-            # Wenn PDF da ist, Download Button zeigen
+            # Download Button
             if f"pdf_data_{key_suffix}" in st.session_state:
                 st.download_button(
                     label="⬇️ Report herunterladen",
@@ -272,7 +285,6 @@ def render():
                     key=f"btn_download_pdf_{key_suffix}",
                     use_container_width=True
                 )
-
         
         # === SUB-TAB: HISTORISCHE SIMULATION ===
         if st.session_state.sim_sub_nav_state == "Historische Simulation":
