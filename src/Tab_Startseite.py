@@ -59,4 +59,5 @@ def render():
         st.session_state.main_nav = "Simulation"
 
     # Wir nutzen 'on_click' um den State sicher zu ändern
-    st.button("➡️ Simulation starten", use_container_width=True, type="primary", on_click=go_to_simulation)
+    # ÄNDERUNG: Emoji entfernt, nur Text "Simulation starten"
+    st.button("Simulation starten", use_container_width=True, type="primary", on_click=go_to_simulation)

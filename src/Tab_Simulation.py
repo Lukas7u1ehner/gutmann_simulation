@@ -9,6 +9,7 @@ from . import plotting
 from . import portfolio_logic
 from . import prognose_logic
 from .catalog import KATALOG
+from .pdf_report import generate_pdf_report # NEU: Import für PDF
 from .style import (
     GUTMANN_ACCENT_GREEN,
     GUTMANN_LIGHT_TEXT,
@@ -92,7 +93,8 @@ def render():
             st.selectbox("Intervall", ["monatlich", "vierteljährlich", "jährlich"], key="widget_add_interval")
         with col_btn:
             st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True) # Spacer zum Ausrichten
-            st.form_submit_button("Titel Hinzufügen", use_container_width=True, on_click=handle_add_click)
+            # HIER WURDE type="primary" HINZUGEFÜGT
+            st.form_submit_button("Titel Hinzufügen", use_container_width=True, type="primary", on_click=handle_add_click)
 
     st.caption("💡 **Tipp:** Zum Löschen einer Position markieren Sie die Zeile links und drücken die **'Entf'-Taste** (Delete) auf Ihrer Tastatur.")
 
@@ -114,14 +116,31 @@ def render():
     
     st.markdown('<div style="margin-bottom: 10px;"></div>', unsafe_allow_html=True)
 
-    # --- 2. KOSTEN SETTINGS ---
+    # --- 2. KOSTEN SETTINGS (Option B: Eigener Toggle statt Popover) ---
+    if "show_cost_settings" not in st.session_state:
+        st.session_state.show_cost_settings = False
+        
+    def toggle_cost_settings():
+        st.session_state.show_cost_settings = not st.session_state.show_cost_settings
+
     col_cost_only, _ = st.columns([1, 3])
     
     with col_cost_only:
-        with st.popover("💸 Kosten Einstellungen", use_container_width=True):
-            st.session_state.cost_ausgabe = st.number_input("Ausgabeaufschlag (%)", 0.0, 10.0, value=st.session_state.cost_ausgabe, step=0.1)
-            st.session_state.cost_management = st.number_input("Managementgebühr (% p.a.)", 0.0, 10.0, value=st.session_state.cost_management, step=0.01)
-            st.session_state.cost_depot = st.number_input("Depotgebühr (€ p.a.)", 0.0, value=st.session_state.cost_depot, step=1.0)
+        # Button, der den Container ein-/ausblendet
+        btn_label = "💸 Kosten Einstellungen verbergen" if st.session_state.show_cost_settings else "💸 Kosten Einstellungen anzeigen"
+        # Wir nutzen hier Secondary Style (default), der durch style.py aber dunkel & grün umrandet ist
+        st.button(btn_label, use_container_width=True, on_click=toggle_cost_settings)
+
+    if st.session_state.show_cost_settings:
+        # Container mit Rahmen für bessere Optik
+        with st.container(border=True):
+            c1, c2, c3 = st.columns(3)
+            with c1:
+                st.session_state.cost_ausgabe = st.number_input("Ausgabeaufschlag (%)", 0.0, 10.0, value=st.session_state.cost_ausgabe, step=0.1)
+            with c2:
+                st.session_state.cost_management = st.number_input("Managementgebühr (% p.a.)", 0.0, 10.0, value=st.session_state.cost_management, step=0.01)
+            with c3:
+                st.session_state.cost_depot = st.number_input("Depotgebühr (€ p.a.)", 0.0, value=st.session_state.cost_depot, step=1.0)
 
 
     # --- 3. AUTOMATISCHE BERECHNUNG (HISTORIE) ---
@@ -173,6 +192,88 @@ def render():
             label_visibility="collapsed"
         )
         
+        # --- PDF REPORT LOGIK ---
+        def show_pdf_download_button(key_suffix):
+            # Prüfen ob Daten da sind
+            if st.session_state.simulations_daten is None:
+                return
+
+            # Wir bauen die KPIs für den Report zusammen
+            hist_kpis_dict = {}
+            if st.session_state.simulations_daten is not None:
+                last_row = st.session_state.simulations_daten.iloc[-1]
+                hist_kpis_dict = {
+                    "Gesamteinzahlung": f"EUR {last_row['Einzahlungen (brutto)']:,.2f}",
+                    "Endkapital (nominal)": f"EUR {last_row['Portfolio (nominal)']:,.2f}",
+                    "Endkapital (real)": f"EUR {last_row['Portfolio (real)']:,.2f}"
+                }
+
+            prog_kpis_dict = {}
+            if st.session_state.prognose_daten is not None:
+                last_row_p = st.session_state.prognose_daten.iloc[-1]
+                prog_kpis_dict = {
+                    "Investiertes Kapital (Plan)": f"EUR {last_row_p['Einzahlungen (brutto)']:,.2f}",
+                    "Endkapital (Median, nom.)": f"EUR {last_row_p['Portfolio (Median)']:,.2f}",
+                    "Endkapital (Median, real)": f"EUR {last_row_p['Portfolio (Real_Median)']:,.2f}"
+                }
+            
+            # Globale Params für Seite 1
+            global_params = {
+                "Prognose-Horizont": f"{st.session_state.prognose_jahre} Jahre",
+                "Ausgabeaufschlag": f"{st.session_state.cost_ausgabe} %",
+                "Managementgebühr": f"{st.session_state.cost_management} % p.a.",
+                "Depotgebühr": f"{st.session_state.cost_depot} EUR p.a."
+            }
+
+            # Button Logik: Erst generieren, dann Download anbieten
+            if st.button("📄 PDF Report erstellen", key=f"btn_gen_pdf_{key_suffix}", use_container_width=True):
+                with st.spinner("Erstelle PDF Report... Charts werden gerendert..."):
+                    # Charts neu erstellen (oder holen wenn in Session State gespeichert wäre)
+                    # Achtung: plotting.create_simulation_chart gibt eine Figure zurück
+                    
+                    # 1. Historie Chart
+                    fig_hist = plotting.create_simulation_chart(
+                        st.session_state.simulations_daten, 
+                        None, 
+                        title="Historische Entwicklung",
+                        show_crisis_events=False # Clean für Report
+                    )
+                    
+                    # 2. Prognose Chart (nur wenn Daten da sind)
+                    fig_prog = None
+                    if st.session_state.prognose_daten is not None:
+                        fig_prog = plotting.create_simulation_chart(
+                            None,
+                            st.session_state.prognose_daten,
+                            title="Zukunftsprognose"
+                        )
+                    
+                    try:
+                        pdf_bytes = generate_pdf_report(
+                            assets=st.session_state.assets,
+                            global_params=global_params,
+                            hist_fig=fig_hist,
+                            hist_kpis=hist_kpis_dict,
+                            prog_fig=fig_prog,
+                            prog_kpis=prog_kpis_dict
+                        )
+                        # PDF in Session State speichern, damit der Download Button erscheint
+                        st.session_state[f"pdf_data_{key_suffix}"] = pdf_bytes
+                    except Exception as e:
+                        st.error(f"Fehler bei der PDF-Erstellung: {e}. Ist 'kaleido' installiert?")
+            
+            # Wenn PDF da ist, Download Button zeigen
+            if f"pdf_data_{key_suffix}" in st.session_state:
+                st.download_button(
+                    label="⬇️ Report herunterladen",
+                    data=st.session_state[f"pdf_data_{key_suffix}"],
+                    file_name=f"Gutmann_Report_{date.today()}.pdf",
+                    mime="application/pdf",
+                    key=f"btn_download_pdf_{key_suffix}",
+                    use_container_width=True
+                )
+
+        
         # === SUB-TAB: HISTORISCHE SIMULATION ===
         if st.session_state.sim_sub_nav_state == "Historische Simulation":
                         
@@ -202,8 +303,17 @@ def render():
                 )
             
             with d_col3:
-                st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
-                show_market_phases = st.toggle("📉 Marktphasen anzeigen", value=False)
+                # EIGENES DESIGN: "Segmented Control" statt Toggle
+                st.markdown("<p style='font-size: 0.8rem; margin-bottom: 0px;'>📉 Marktphasen anzeigen</p>", unsafe_allow_html=True)
+                phases_radio = st.radio(
+                    "Marktphasen anzeigen", 
+                    options=["Ja", "Nein"], 
+                    index=1,
+                    horizontal=True,
+                    label_visibility="collapsed",
+                    key="widget_show_phases"
+                )
+                show_market_phases = (phases_radio == "Ja")
 
             hist_returns = st.session_state.historical_returns_pa
             if hist_returns:
@@ -234,6 +344,10 @@ def render():
                 st.metric("Endkapital (nominal)", f"€ {end_value_nominal:,.2f}")
                 st.metric("Endkapital (real)", f"€ {end_value_real:,.2f}", help="Kaufkraftbereinigt (basierend auf HICP Daten)")
                 st.metric("Gesamtrendite (nom.)", f"{rendite_nominal_prozent:,.2f} %")
+                
+                st.markdown("---")
+                # PDF BUTTON HISTORIE
+                show_pdf_download_button("hist")
 
 
         # === SUB-TAB: ZUKUNFTSPROGNOSE ===
@@ -362,3 +476,7 @@ def render():
                     st.metric("Endkapital (Median, nom.)", f"€ {end_val_nom:,.2f}")
                     st.metric("Rendite (auf Gesamt)", f"{rendite_nom:,.2f} %", help="Rendite bezogen auf Startkapital + Sparraten")
                     st.metric("Endkapital (real)", f"€ {end_val_real:,.2f}", help="Kaufkraftbereinigt nach Inflationsmodell")
+                    
+                    st.markdown("---")
+                    # PDF BUTTON PROGNOSE
+                    show_pdf_download_button("prog")
