@@ -107,7 +107,6 @@ if "katalog_auswahl" not in st.session_state:
     st.session_state.katalog_auswahl = "Bitte wählen..."
 if "assets" not in st.session_state:
     st.session_state.assets = [
-        {"Name": "S&P 500 ETF", "ISIN / Ticker": "IE00B5BMR087", "Einmalerlag (€)": 1000.0, "Sparbetrag (€)": 100.0, "Spar-Intervall": "monatlich"},
         {"Name": "Apple Aktie", "ISIN / Ticker": "US0378331005", "Einmalerlag (€)": 500.0, "Sparbetrag (€)": 50.0, "Spar-Intervall": "monatlich"},
     ]
 
