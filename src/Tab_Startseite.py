@@ -61,3 +61,37 @@ def render():
     # Wir nutzen 'on_click' um den State sicher zu ändern
     # ÄNDERUNG: Emoji entfernt, nur Text "Simulation starten"
     st.button("Simulation starten", use_container_width=True, type="primary", on_click=go_to_simulation)
+
+    # --- DATEN-WARTUNG (Cache Pre-loading) ---
+    with st.expander("🛠️ System-Wartung (Daten-Cache)"):
+        st.write("Laden Sie hier alle Marktdaten für den Katalog lokal herunter, um die App offline-fähig und robuster zu machen.")
+        
+        if st.button("Gesamten Katalog vorladen (ab 2000)", use_container_width=True):
+            from .cache_manager import preload_all_data
+            
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            status_text.write("⏳ Starte Pre-loading... Dies kann einige Minuten dauern.")
+            
+            # Da wir die Progress-Bar anzeigen wollen, rufen wir eine leicht angepasste Version auf
+            from .catalog import KATALOG
+            from . import backend_simulation
+            from datetime import date
+            import time
+            
+            tickers = [v for k, v in KATALOG.items() if v]
+            total = len(tickers)
+            
+            for i, ticker in enumerate(tickers, 1):
+                status_text.write(f"Verarbeite {i}/{total}: **{ticker}**")
+                try:
+                    backend_simulation.load_data(ticker, date(2000, 1, 1), date.today())
+                except Exception as e:
+                    st.error(f"Fehler bei {ticker}: {e}")
+                
+                progress_bar.progress(i / total)
+                time.sleep(0.1) # Kurze Pause
+                
+            status_text.write("✅ **Pre-loading abgeschlossen!** Alle Daten sind nun lokal gespeichert.")
+            st.balloons()

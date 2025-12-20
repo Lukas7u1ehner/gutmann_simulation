@@ -2,6 +2,15 @@ import streamlit as st
 from datetime import date
 import sys, os
 
+# --- PERMANENTER SSL-FIX (vor allen anderen Imports) ---
+try:
+    import certifi
+    os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+    os.environ['SSL_CERT_FILE'] = certifi.where()
+except ImportError:
+    pass
+# ------------------------------------------------------
+
 st.set_page_config(page_title="Simulation | Gutmann", page_icon="📈", layout="wide")
 
 try:
@@ -122,7 +131,7 @@ if "inflation_slider" not in st.session_state:
 
 # Prognose Parameter Init
 if "prognose_jahre" not in st.session_state:
-    st.session_state.prognose_jahre = 5 
+    st.session_state.prognose_jahre = 15 
 
 # Daten-Container Init
 if "simulations_daten" not in st.session_state:

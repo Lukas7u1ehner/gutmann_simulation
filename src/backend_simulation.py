@@ -3,14 +3,65 @@ import pandas as pd
 from datetime import date, timedelta
 import streamlit as st
 import numpy as np
+import os
+
+# --- CACHE KONFIGURATION ---
+CACHE_DIR = os.path.join(os.path.dirname(__file__), "data", "cache")
+os.makedirs(CACHE_DIR, exist_ok=True)
 
 @st.cache_data
 def load_data(isin: str, start_date: date, end_date: date) -> pd.DataFrame | None:
     """
-    Holt die historischen Kursdaten für eine gegebene ISIN (oder Ticker)
-    in einem bestimmten Zeitraum.
+    Holt die historischen Kursdaten für eine gegebene ISIN (oder Ticker).
+    Prüft zuerst im lokalen Cache (CSV), ob Daten für den Zeitraum vorhanden sind.
     """
-    print(f"Lade Daten für {isin} von {start_date} bis {end_date}...")
+    # 1. Suche nach allen Cache-Dateien für diesen Ticker
+    # Format: {isin}_{start}_{end}.csv
+    cache_files = []
+    if os.path.exists(CACHE_DIR):
+        for filename in os.listdir(CACHE_DIR):
+            if filename.startswith(isin + "_") and filename.endswith(".csv"):
+                cache_files.append(filename)
+    
+    # 2. Prüfe, ob eine der Cache-Dateien den gewünschten Zeitraum abdeckt
+    for cache_file in cache_files:
+        try:
+            # Parse Dateinamen: TICKER_START_END.csv
+            parts = cache_file.replace(".csv", "").split("_")
+            if len(parts) >= 3:
+                # Letzten 3 Teile sind: YYYY-MM-DD, YYYY-MM-DD (Start, End)
+                # Bei ISINs mit Unterstrichen müssen wir von hinten parsen
+                cached_end_str = parts[-1]
+                cached_start_str = parts[-2]
+                
+                try:
+                    cached_start = date.fromisoformat(cached_start_str)
+                    cached_end = date.fromisoformat(cached_end_str)
+                    
+                    # Prüfe, ob der gewünschte Zeitraum innerhalb des gecachten liegt
+                    if cached_start <= start_date and cached_end >= end_date:
+                        print(f"Lade {isin} aus lokalem Cache ({cache_file})...")
+                        cache_path = os.path.join(CACHE_DIR, cache_file)
+                        
+                        cached_data = pd.read_csv(cache_path, index_col=0, parse_dates=True)
+                        
+                        # Filtere auf den gewünschten Zeitraum
+                        mask = (cached_data.index >= pd.to_datetime(start_date)) & \
+                               (cached_data.index <= pd.to_datetime(end_date))
+                        filtered_data = cached_data.loc[mask]
+                        
+                        if "Close" in filtered_data.columns:
+                            return filtered_data[["Close"]]
+                        return filtered_data
+                except ValueError:
+                    # Datum konnte nicht geparst werden, überspringe diese Datei
+                    continue
+        except Exception as e:
+            print(f"Fehler beim Lesen des Caches {cache_file}: {e}")
+            continue
+
+    # 3. Wenn nicht im Cache, von yfinance laden
+    print(f"Lade Daten für {isin} von yfinance ({start_date} bis {end_date})...")
 
     try:
         data = yf.download(isin, start=start_date, end=end_date)
@@ -19,28 +70,30 @@ def load_data(isin: str, start_date: date, end_date: date) -> pd.DataFrame | Non
             print(f"Keine Daten gefunden für Ticker: {isin}")
             return None
 
-        print("Daten erfolgreich geladen.")
-
-        # --- FIX FÜR MULTI-INDEX SPALTEN (z.B. bei ISINs) ---
+        # --- FIX FÜR MULTI-INDEX SPALTEN ---
         if isinstance(data.columns, pd.MultiIndex):
-            # Finde die 'Close'-Spalte
             close_col_name = [col for col in data.columns if col[0] == "Close"][0]
             close_data = data[[close_col_name]].copy()
             close_data.columns = ["Close"]
         else:
-            # Normaler Index (z.B. bei Ticker 'AAPL')
             close_data = data[["Close"]].copy()
 
-        # Stelle sicher, dass das Datum ein 'datetime' Objekt ist
         close_data.index = pd.to_datetime(close_data.index)
-
-        # Fülle fehlende 'Close' Preise (Wochenenden, Feiertage)
         close_data["Close"] = close_data["Close"].ffill()
+
+        # 4. Erfolgreich geladene Daten im Cache speichern
+        try:
+            cache_filename = f"{isin}_{start_date}_{end_date}.csv".replace(" ", "_")
+            cache_path = os.path.join(CACHE_DIR, cache_filename)
+            close_data.to_csv(cache_path)
+            print(f"Daten für {isin} im Cache gespeichert ({cache_filename}).")
+        except Exception as e:
+            print(f"Fehler beim Speichern des Caches für {isin}: {e}")
 
         return close_data
 
     except Exception as e:
-        print(f"Ein Fehler ist aufgetreten: {e}")
+        print(f"Ein Fehler bei yfinance ist aufgetreten: {e}")
         return None
 
 

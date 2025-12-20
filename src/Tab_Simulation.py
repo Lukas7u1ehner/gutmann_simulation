@@ -2,6 +2,8 @@ import streamlit as st
 from datetime import date
 import numpy as np
 import yfinance as yf
+import base64
+import streamlit.components.v1 as components
 
 # Relative Imports innerhalb des src-Pakets
 from . import backend_simulation
@@ -168,6 +170,36 @@ def render():
                         st.session_state.prognosis_assumptions_pa[name] = value
                         
                  simulation_successful = True
+                 
+                 # --- AUTOMATISCHE PROGNOSEBERECHNUNG ---
+                 # Berechne Startkapital aus Assets
+                 start_capital_from_table = sum(
+                     asset.get("Einmalerlag (€)", 0.0) 
+                     for asset in st.session_state.assets 
+                     if asset.get("ISIN / Ticker")
+                 )
+                 
+                 start_vals = {
+                     "letzter_tag": date.today(),
+                     "nominal": start_capital_from_table,
+                     "real": start_capital_from_table,
+                     "einzahlung": start_capital_from_table
+                 }
+                 
+                 # Prognose berechnen (für PDF-Export)
+                 st.session_state.prognose_daten = prognose_logic.run_forecast(
+                     start_values=start_vals,
+                     assets=st.session_state.assets,
+                     prognose_jahre=st.session_state.prognose_jahre,
+                     sparplan_fortfuehren=FIXED_SPARPLAN_ACTIVE,
+                     kosten_management_pa_pct=st.session_state.cost_management,
+                     kosten_depot_pa_eur=st.session_state.cost_depot,
+                     ausgabeaufschlag_pct=st.session_state.cost_ausgabe,
+                     expected_asset_returns_pa=st.session_state.prognosis_assumptions_pa,
+                     asset_final_values=st.session_state.asset_final_values,
+                     expected_volatility_pa=FIXED_VOLATILITY,
+                     n_simulations=FIXED_N_SIMULATIONS
+                 )
     else:
         st.info("Bitte füge Titel zum Portfolio hinzu, um die Simulation zu starten.")
 
@@ -242,49 +274,70 @@ def render():
                 "Depotgebühr": f"{st.session_state.cost_depot} EUR p.a."
             }
 
-            # Button
-            if st.button("PDF Report erstellen", key=f"btn_gen_pdf_{key_suffix}", use_container_width=True):
-                with st.spinner("Erstelle PDF Report..."):
-                    # 1. Historie Chart neu erstellen (für sauberen Look)
-                    fig_hist = plotting.create_simulation_chart(
-                        st.session_state.simulations_daten, 
-                        None, 
-                        title="Historische Entwicklung",
-                        show_crisis_events=False
-                    )
-                    
-                    # 2. Prognose Chart neu erstellen (nur wenn Daten da)
-                    fig_prog = None
-                    if st.session_state.prognose_daten is not None:
-                        fig_prog = plotting.create_simulation_chart(
-                            None,
-                            st.session_state.prognose_daten,
-                            title="Zukunftsprognose"
-                        )
-                    
-                    try:
-                        pdf_bytes = generate_pdf_report(
-                            assets=st.session_state.assets,
-                            global_params=global_params,
-                            hist_fig=fig_hist,
-                            hist_kpis=hist_kpis_dict,
-                            prog_fig=fig_prog,
-                            prog_kpis=prog_kpis_dict
-                        )
-                        st.session_state[f"pdf_data_{key_suffix}"] = pdf_bytes
-                    except Exception as e:
-                        st.error(f"Fehler bei der PDF-Erstellung: {e}")
-            
-            # Download Button
-            if f"pdf_data_{key_suffix}" in st.session_state:
-                st.download_button(
-                    label="⬇️ Report herunterladen",
-                    data=st.session_state[f"pdf_data_{key_suffix}"],
-                    file_name=f"Gutmann_Report_{date.today()}.pdf",
-                    mime="application/pdf",
-                    key=f"btn_download_pdf_{key_suffix}",
-                    use_container_width=True
+            # Funktion zum Generieren der PDF
+            def generate_pdf_for_download():
+                # 1. Historie Chart neu erstellen (für sauberen Look)
+                fig_hist = plotting.create_simulation_chart(
+                    st.session_state.simulations_daten, 
+                    None, 
+                    title="Historische Entwicklung",
+                    show_crisis_events=False
                 )
+                
+                # 2. Prognose Chart neu erstellen (nur wenn Daten da)
+                fig_prog = None
+                if st.session_state.prognose_daten is not None:
+                    fig_prog = plotting.create_simulation_chart(
+                        None,
+                        st.session_state.prognose_daten,
+                        title="Zukunftsprognose"
+                    )
+                
+                try:
+                    pdf_bytes = generate_pdf_report(
+                        assets=st.session_state.assets,
+                        global_params=global_params,
+                        hist_fig=fig_hist,
+                        hist_kpis=hist_kpis_dict,
+                        prog_fig=fig_prog,
+                        prog_kpis=prog_kpis_dict
+                    )
+                    st.session_state[f"pdf_data_{key_suffix}"] = pdf_bytes
+                    st.session_state[f"pdf_trigger_{key_suffix}"] = True
+                except Exception as e:
+                    st.error(f"Fehler bei der PDF-Erstellung: {e}")
+            
+            # Button zum Starten der Generierung
+            if st.button("📄 PDF Report erstellen & herunterladen", key=f"btn_gen_pdf_{key_suffix}", use_container_width=True, type="primary"):
+                with st.spinner("Erstelle PDF Report..."):
+                    generate_pdf_for_download()
+            
+            # Automatischer JS-Trigger für den Download
+            if st.session_state.get(f"pdf_trigger_{key_suffix}"):
+                pdf_data = st.session_state[f"pdf_data_{key_suffix}"]
+                b64_pdf = base64.b64encode(pdf_data).decode('utf-8')
+                filename = f"Gutmann_Report_{date.today()}.pdf"
+                
+                # JavaScript zum automatischen Download
+                js_download = f"""
+                <html>
+                    <body>
+                        <script>
+                            var link = document.createElement('a');
+                            link.href = 'data:application/pdf;base64,{b64_pdf}';
+                            link.download = '{filename}';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        </script>
+                    </body>
+                </html>
+                """
+                components.html(js_download, height=0)
+                
+                # Trigger zurücksetzen, damit es nicht bei jedem Rerender passiert
+                st.session_state[f"pdf_trigger_{key_suffix}"] = False
+                st.success("✅ Download gestartet!")
         
         # === SUB-TAB: HISTORISCHE SIMULATION ===
         if st.session_state.sim_sub_nav_state == "Historische Simulation":
