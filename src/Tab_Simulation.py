@@ -147,59 +147,79 @@ def render():
 
     # --- 3. AUTOMATISCHE BERECHNUNG (HISTORIE) ---
     simulation_successful = False
+    
+    # Check if calculation is needed (Assets changed, dates changed, or results missing)
+    # create a hash or a list of relevant keys to detect changes
+    calc_relevant_state = {
+        "assets": st.session_state.assets,
+        "start_date": st.session_state.sim_start_date,
+        "end_date": st.session_state.sim_end_date,
+        "ausgabe": st.session_state.cost_ausgabe,
+        "mgmt": st.session_state.cost_management,
+        "depot": st.session_state.cost_depot
+    }
+    
+    if "last_calc_state" not in st.session_state:
+        st.session_state.last_calc_state = None
+        
+    needs_recalc = (st.session_state.last_calc_state != calc_relevant_state) or (st.session_state.simulations_daten is None)
+    
     assets_to_simulate = [asset for asset in st.session_state.assets if asset.get("ISIN / Ticker")]
     
     if assets_to_simulate:
-        with st.spinner("Berechne Portfolio..."):
-             # Historie nutzt automatisch inflation.py via portfolio_logic
-             sim_data, hist_returns, final_values = portfolio_logic.run_portfolio_simulation(
-                assets=assets_to_simulate,
-                start_date=st.session_state.sim_start_date,
-                end_date=st.session_state.sim_end_date,
-                ausgabeaufschlag_pct=st.session_state.cost_ausgabe,
-                managementgebuehr_pa_pct=st.session_state.cost_management,
-                depotgebuehr_pa_eur=st.session_state.cost_depot,
-            )
-             if sim_data is not None:
-                 st.session_state.simulations_daten = sim_data
-                 st.session_state.historical_returns_pa = hist_returns
-                 st.session_state.asset_final_values = final_values
-                 
-                 for name, value in hist_returns.items():
-                    if name not in st.session_state.prognosis_assumptions_pa:
-                        st.session_state.prognosis_assumptions_pa[name] = value
-                        
-                 simulation_successful = True
-                 
-                 # --- AUTOMATISCHE PROGNOSEBERECHNUNG ---
-                 # Berechne Startkapital aus Assets
-                 start_capital_from_table = sum(
-                     asset.get("Einmalerlag (€)", 0.0) 
-                     for asset in st.session_state.assets 
-                     if asset.get("ISIN / Ticker")
-                 )
-                 
-                 start_vals = {
-                     "letzter_tag": date.today(),
-                     "nominal": start_capital_from_table,
-                     "real": start_capital_from_table,
-                     "einzahlung": start_capital_from_table
-                 }
-                 
-                 # Prognose berechnen (für PDF-Export)
-                 st.session_state.prognose_daten = prognose_logic.run_forecast(
-                     start_values=start_vals,
-                     assets=st.session_state.assets,
-                     prognose_jahre=st.session_state.prognose_jahre,
-                     sparplan_fortfuehren=FIXED_SPARPLAN_ACTIVE,
-                     kosten_management_pa_pct=st.session_state.cost_management,
-                     kosten_depot_pa_eur=st.session_state.cost_depot,
-                     ausgabeaufschlag_pct=st.session_state.cost_ausgabe,
-                     expected_asset_returns_pa=st.session_state.prognosis_assumptions_pa,
-                     asset_final_values=st.session_state.asset_final_values,
-                     expected_volatility_pa=FIXED_VOLATILITY,
-                     n_simulations=FIXED_N_SIMULATIONS
-                 )
+        if needs_recalc:
+            with st.spinner("Berechne Portfolio..."):
+                 # Historie nutzt automatisch inflation.py via portfolio_logic
+                 sim_data, hist_returns, final_values = portfolio_logic.run_portfolio_simulation(
+                    assets=assets_to_simulate,
+                    start_date=st.session_state.sim_start_date,
+                    end_date=st.session_state.sim_end_date,
+                    ausgabeaufschlag_pct=st.session_state.cost_ausgabe,
+                    managementgebuehr_pa_pct=st.session_state.cost_management,
+                    depotgebuehr_pa_eur=st.session_state.cost_depot,
+                )
+                 if sim_data is not None:
+                     st.session_state.simulations_daten = sim_data
+                     st.session_state.historical_returns_pa = hist_returns
+                     st.session_state.asset_final_values = final_values
+                     
+                     for name, value in hist_returns.items():
+                        if name not in st.session_state.prognosis_assumptions_pa:
+                            st.session_state.prognosis_assumptions_pa[name] = value
+                            
+                     # --- AUTOMATISCHE PROGNOSEBERECHNUNG ---
+                     start_capital_from_table = sum(
+                         asset.get("Einmalerlag (€)", 0.0) 
+                         for asset in st.session_state.assets 
+                         if asset.get("ISIN / Ticker")
+                     )
+                     
+                     start_vals = {
+                         "letzter_tag": date.today(),
+                         "nominal": start_capital_from_table,
+                         "real": start_capital_from_table,
+                         "einzahlung": start_capital_from_table
+                     }
+                     
+                     st.session_state.prognose_daten = prognose_logic.run_forecast(
+                         start_values=start_vals,
+                         assets=st.session_state.assets,
+                         prognose_jahre=st.session_state.prognose_jahre,
+                         sparplan_fortfuehren=FIXED_SPARPLAN_ACTIVE,
+                         kosten_management_pa_pct=st.session_state.cost_management,
+                         kosten_depot_pa_eur=st.session_state.cost_depot,
+                         ausgabeaufschlag_pct=st.session_state.cost_ausgabe,
+                         expected_asset_returns_pa=st.session_state.prognosis_assumptions_pa,
+                         asset_final_values=st.session_state.asset_final_values,
+                         expected_volatility_pa=FIXED_VOLATILITY,
+                         n_simulations=FIXED_N_SIMULATIONS
+                     )
+                     
+                     st.session_state.last_calc_state = calc_relevant_state
+                     simulation_successful = True
+        else:
+            # Daten sind bereits aktuell im Session State
+            simulation_successful = True
     else:
         st.info("Bitte füge Titel zum Portfolio hinzu, um die Simulation zu starten.")
 
@@ -320,22 +340,21 @@ def render():
                 
                 # JavaScript zum automatischen Download
                 js_download = f"""
-                <html>
-                    <body>
-                        <script>
-                            var link = document.createElement('a');
-                            link.href = 'data:application/pdf;base64,{b64_pdf}';
-                            link.download = '{filename}';
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                        </script>
-                    </body>
-                </html>
+                    <script>
+                        var link = document.createElement('a');
+                        link.href = 'data:application/pdf;base64,{b64_pdf}';
+                        link.download = '{filename}';
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    </script>
                 """
-                components.html(js_download, height=0)
+                # Nutze st.empty() um Platz zu sparen und Layout-Shifts zu minimieren
+                placeholder = st.empty()
+                with placeholder:
+                    components.html(f"<html><body>{js_download}</body></html>", height=0)
                 
-                # Trigger zurücksetzen, damit es nicht bei jedem Rerender passiert
+                # Trigger zurücksetzen
                 st.session_state[f"pdf_trigger_{key_suffix}"] = False
                 st.success("✅ Download gestartet!")
         
