@@ -14,7 +14,7 @@ except ImportError:
 st.set_page_config(page_title="Simulation | Gutmann", page_icon="📈", layout="wide")
 
 # --- URL-PARAMETER-HANDLING (Tool A -> Tool B Simulation) ---
-# Für FH-Projekt: Simul iert die Übergabe von Beraterdaten aus Tool A
+# Für FH-Projekt: Simuliert die Übergabe von Beraterdaten aus Tool A
 try:
     query_params = st.query_params
     
@@ -24,8 +24,22 @@ try:
     budget_str = query_params.get("budget", "25000")
     einmalerlag_str = query_params.get("einmalerlag", "0")  # NEU: Gesamt-Einmalerlag für Portfolio
     portfolio_type = query_params.get("portfolioType", None)  # None = kein Auto-Loading
-    savings_rate_str = query_params.get("savingsRate", "0")
+    # Support both snake_case and camelCase for savings_rate
+    savings_rate_str = query_params.get("savings_rate", query_params.get("savingsRate", "0"))
     savings_interval = query_params.get("savingsInterval", "monatlich")
+    
+    # NEU: Custom Gewichtungen parsen (optional)
+    # Format: weight_TICKER=percentage (z.B. weight_LLY=40&weight_GOOGL=35)
+    custom_weights = {}
+    for key in query_params.keys():
+        if key.startswith("weight_"):
+            ticker = key.replace("weight_", "")
+            try:
+                weight_value = float(query_params.get(key, "0"))
+                if 0 <= weight_value <= 100:
+                    custom_weights[ticker] = weight_value
+            except ValueError:
+                pass  # Ignoriere ungültige Gewichtungen
     
     # Konvertierung zu Zahlen
     try:
@@ -47,6 +61,7 @@ try:
             "portfolio_type": portfolio_type,
             "savings_rate": savings_rate,
             "savings_interval": savings_interval,
+            "custom_weights": custom_weights,  # NEU: Custom Gewichtungen aus URL
             "preloaded": False  # Flag für einmaliges Auto-Loading
         }
 except Exception as e:
@@ -60,6 +75,7 @@ except Exception as e:
             "portfolio_type": None,
             "savings_rate": 0.0,
             "savings_interval": "monatlich",
+            "custom_weights": {},
             "preloaded": False
         }
 # ------------------------------------------------------
@@ -166,9 +182,7 @@ if "sim_end_date" not in st.session_state:
 if "katalog_auswahl" not in st.session_state:
     st.session_state.katalog_auswahl = "Bitte wählen..."
 if "assets" not in st.session_state:
-    st.session_state.assets = [
-        {"Name": "Apple Aktie", "ISIN / Ticker": "US0378331005", "Einmalerlag (€)": 500.0, "Sparbetrag (€)": 50.0, "Spar-Intervall": "monatlich"},
-    ]
+    st.session_state.assets = []
 
 # Globale Parameter Init
 if "cost_ausgabe" not in st.session_state:

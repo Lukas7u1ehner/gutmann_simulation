@@ -6,40 +6,40 @@ PORTFOLIO_TEMPLATES = {
         "display_name": "Nachhaltigkeit (ESG)",
         "description": "Fokus auf nachhaltige Investments und ESG-Kriterien",
         "assets": [
-            {"ticker": "LLY", "name": "Eli Lilly"},
-            {"ticker": "GOOGL", "name": "Alphabet / Google"},
-            {"ticker": "KO", "name": "Coca-Cola"},
-            {"ticker": "AAPL", "name": "Apple"}
+            {"ticker": "LLY", "name": "Eli Lilly", "weight": 35},
+            {"ticker": "GOOGL", "name": "Alphabet / Google", "weight": 30},
+            {"ticker": "KO", "name": "Coca-Cola", "weight": 20},
+            {"ticker": "AAPL", "name": "Apple", "weight": 15}
         ]
     },
     "Quantitativ (Rule-based)": {
         "display_name": "Quantitativ (Rule-based)",
         "description": "Datengetriebene Auswahl nach quantitativen Kriterien",
         "assets": [
-            {"ticker": "NVDA", "name": "NVIDIA"},
-            {"ticker": "MSFT", "name": "Microsoft"},
-            {"ticker": "ADBE", "name": "Adobe"},
-            {"ticker": "ORCL", "name": "Oracle"}
+            {"ticker": "NVDA", "name": "NVIDIA", "weight": 40},
+            {"ticker": "MSFT", "name": "Microsoft", "weight": 30},
+            {"ticker": "ADBE", "name": "Adobe", "weight": 20},
+            {"ticker": "ORCL", "name": "Oracle", "weight": 10}
         ]
     },
     "Wachstum (Aktienfokus)": {
         "display_name": "Wachstum (Aktienfokus)",
         "description": "Wachstumsorientierte Aktien mit hohem Potenzial",
         "assets": [
-            {"ticker": "PSTG", "name": "Pure Storage"},
-            {"ticker": "QCOM", "name": "Qualcomm"},
-            {"ticker": "MRVL", "name": "Marvell Technology"},
-            {"ticker": "CRM", "name": "Salesforce"}
+            {"ticker": "PSTG", "name": "Pure Storage", "weight": 30},
+            {"ticker": "QCOM", "name": "Qualcomm", "weight": 30},
+            {"ticker": "MRVL", "name": "Marvell Technology", "weight": 25},
+            {"ticker": "CRM", "name": "Salesforce", "weight": 15}
         ]
     },
     "Ausgewogen (Multi-Asset)": {
         "display_name": "Ausgewogen (Multi-Asset)",
         "description": "Ausgewogenes Portfolio mit Blue Chips und Dividendentiteln",
         "assets": [
-            {"ticker": "NESN.SW", "name": "Nestlé"},
-            {"ticker": "V", "name": "Visa"},
-            {"ticker": "JPM", "name": "JPMorgan Chase"},
-            {"ticker": "AAPL", "name": "Apple"}
+            {"ticker": "NESN.SW", "name": "Nestlé", "weight": 30},
+            {"ticker": "V", "name": "Visa", "weight": 30},
+            {"ticker": "JPM", "name": "JPMorgan Chase", "weight": 25},
+            {"ticker": "AAPL", "name": "Apple", "weight": 15}
         ]
     }
 }
@@ -47,7 +47,7 @@ PORTFOLIO_TEMPLATES = {
 
 def load_portfolio_template(portfolio_type: str, budget: float, savings_rate: float, savings_interval: str = "monatlich"):
     """
-    Lädt ein Portfolio-Template und verteilt Budget gleichmäßig auf alle Assets
+    Lädt ein Portfolio-Template und verteilt Budget basierend auf Gewichtungen
     
     Args:
         portfolio_type: Name des Portfolio-Typs (z.B. "Nachhaltigkeit (ESG)")
@@ -64,17 +64,17 @@ def load_portfolio_template(portfolio_type: str, budget: float, savings_rate: fl
     template = PORTFOLIO_TEMPLATES[portfolio_type]
     num_assets = len(template["assets"])
     
-    # Gleichmäßige Verteilung
-    einmalerlag_per_asset = budget / num_assets
-    sparrate_per_asset = savings_rate / num_assets
-    
     loaded_assets = []
     for asset_template in template["assets"]:
+        # Gewicht aus Template, Fallback zu Gleichverteilung
+        weight = asset_template.get("weight", 100.0 / num_assets)
+        
         loaded_assets.append({
             "Name": asset_template["name"],
             "ISIN / Ticker": asset_template["ticker"],
-            "Einmalerlag (€)": round(einmalerlag_per_asset, 2),
-            "Sparbetrag (€)": round(sparrate_per_asset, 2),
+            "Gewichtung (%)": weight,
+            "Einmalerlag (€)": (budget * weight) / 100,
+            "Sparbetrag (€)": (savings_rate * weight) / 100,
             "Spar-Intervall": savings_interval
         })
     

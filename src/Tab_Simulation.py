@@ -35,6 +35,11 @@ def render():
     """
     Rendert den gesamten Inhalt des 'Simulation' Tabs.
     """
+    # --- RERUN FLAG SYSTEM ---
+    # Initialisiere Flag für verzögerte Reruns (verhindert Button-Konflikte)
+    if "needs_rerun" not in st.session_state:
+        st.session_state.needs_rerun = False
+    
     # --- HEADER: BERATER & KUNDENDATEN (READ-ONLY) ---
     handover = st.session_state.get("handover_data", {})
     budget_limit = handover.get("budget", 0)
@@ -97,7 +102,7 @@ def render():
                 st.metric("Sparrate", f"€ {sparrate_display:,.0f}")
             with r2c2:
                 # Truncate portfolio name if too long
-                trunc_type = portfolio_type_display
+                trunc_type = str(portfolio_type_display) if portfolio_type_display else "Manuell"
                 if len(trunc_type) > 15:
                     # Suche nach Klammer oder kürze hart
                     if "(" in trunc_type:
@@ -118,6 +123,7 @@ def render():
         einmalerlag_for_loading = handover.get("einmalerlag", 0)
         savings_rate = handover.get("savings_rate", 0)
         savings_interval = handover.get("savings_interval", "monatlich")
+        custom_weights = handover.get("custom_weights", {})  # NEU: Custom Gewichtungen aus URL
         
         # Portfolio-Template laden
         loaded_assets = load_portfolio_template(
@@ -126,6 +132,18 @@ def render():
             savings_rate,
             savings_interval
         )
+        
+        # NEU: Custom Gewichtungen anwenden, falls vorhanden
+        if loaded_assets and custom_weights:
+            # Gewichtungen überschreiben
+            for asset in loaded_assets:
+                ticker = asset.get("ISIN / Ticker", "")
+                if ticker in custom_weights:
+                    new_weight = custom_weights[ticker]
+                    asset["Gewichtung (%)"] = new_weight
+                    # Euro-Beträge neu berechnen
+                    asset["Einmalerlag (€)"] = (einmalerlag_for_loading * new_weight) / 100
+                    asset["Sparbetrag (€)"] = (savings_rate * new_weight) / 100
         
         if loaded_assets:
             # Assets zur bestehenden Liste hinzufügen (NICHT ersetzen für Hybrid-Modus)
@@ -136,96 +154,285 @@ def render():
             
             # Popup-Feedback statt permanentem Banner
             portfolio_display_name = get_portfolio_display_name(portfolio_type)
-            st.toast(f"Basis-Portfolio '{portfolio_display_name}' wurde geladen.", icon="✅")
+            weight_info = " (mit custom Gewichtungen)" if custom_weights else ""
+            st.toast(f"Basis-Portfolio '{portfolio_display_name}'{weight_info} wurde geladen.", icon="✅")
     
-    # --- 1. ASSET HANDLING ---
-    st.subheader("💰 Titel zum Portfolio hinzufügen")
+    # =====================================================================
+    # SECTION 1: EMPFOHLENE PRODUKTE (Main product table)
+    # =====================================================================
     
-    # Callback für Hinzufügen
-    def handle_add_click():
-        name_to_add = ""
-        isin_to_add = ""
-        is_valid = False
-        
-        # Werte aus dem Formular lesen
-        start_invest = st.session_state.widget_add_start
-        savings_rate = st.session_state.widget_add_savings
-        interval = st.session_state.widget_add_interval
+    st.subheader("Empfohlene Produkte")
+    
+    # Hilfsfunktion: Gewichte neu berechnen wenn sich etwas ändert
+    gesamt_einmalerlag = handover.get("einmalerlag", 0)
+    gesamt_sparrate = handover.get("savings_rate", 0)
+    
+    # CSS to hide +/- buttons on number inputs AND center content vertically
+    st.markdown("""
+    <style>
+    /* Hide increment/decrement buttons on number inputs if any are left */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+    input[type=number] {
+        -moz-appearance: textfield;
+    }
+    
+    /* Align horizontal blocks (rows) ONLY within product table - addressing Header Alignment issue */
+    .product-table div[data-testid="stHorizontalBlock"] {
+        align-items: center !important;
+    }
 
-        if st.session_state.katalog_auswahl != "Bitte wählen...":
-            name_to_add = st.session_state.katalog_auswahl
-            isin_to_add = KATALOG[st.session_state.katalog_auswahl]
-            is_valid = True
-        elif st.session_state.manuelle_isin:
-            isin_to_add = st.session_state.manuelle_isin
-            with st.spinner(f"Prüfe Ticker {isin_to_add}..."):
-                is_valid, message_or_name = backend_simulation.validate_and_get_info(isin_to_add)
-                if is_valid:
-                    name_to_add = message_or_name
-                else:
-                    st.toast(f"Fehler: {message_or_name}", icon="❌")
-        
-        if is_valid and isin_to_add:
-            st.session_state.assets.append({
-                "Name": name_to_add,
-                "ISIN / Ticker": isin_to_add,
-                "Einmalerlag (€)": start_invest, 
-                "Sparbetrag (€)": savings_rate,
-                "Spar-Intervall": interval,
-            })
-            st.toast(f"'{name_to_add}' erfolgreich hinzugefügt!", icon="✅")
-            # Reset der Inputs
-            st.session_state.katalog_auswahl = "Bitte wählen..."
-            st.session_state.manuelle_isin = ""
+    /* SPECIFICALLY center the table header row */
+    div.table-header [data-testid="stMarkdown"] p {
+        text-align: center !important;
+        font-weight: bold !important;
+    }
 
-    # Formular - PLATZSPARENDES LAYOUT
-    with st.form(key="add_title_form", clear_on_submit=False):
-        
-        # Zeile 1: Katalog & ISIN - Nutzt 75% der Breite [1.5, 1.5, 1]
-        col_sel1, col_sel2, _ = st.columns([1.5, 1.5, 1])
-        with col_sel1:
-            st.selectbox("Titel aus Katalog wählen", KATALOG.keys(), key="katalog_auswahl")
-        with col_sel2:
-            st.text_input("Oder ISIN / Ticker manuell eingeben", key="manuelle_isin", placeholder="z.B. US0378331005")
-        
-        # Zeile 2: Beträge + Button in einer Reihe -> Sehr kompakt
-        col_val1, col_val2, col_val3, col_btn = st.columns([1, 1, 1, 1])
-        with col_val1:
-            st.number_input("Einmalerlag (€)", min_value=0.0, value=1000.0, step=100.0, key="widget_add_start")
-        with col_val2:
-            st.number_input("Sparrate (€)", min_value=0.0, value=100.0, step=10.0, key="widget_add_savings")
-        with col_val3:
-            st.selectbox("Intervall", ["monatlich", "vierteljährlich", "jährlich"], key="widget_add_interval")
-        with col_btn:
-            st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True) # Spacer zum Ausrichten
-            # HIER WURDE type="primary" HINZUGEFÜGT
-            st.form_submit_button("Titel Hinzufügen", use_container_width=True, type="primary", on_click=handle_add_click)
+    /* DRASTISCH REDUCE container padding */
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"] > div[data-testid="stVerticalBlock"] > div.element-container {
+        padding-top: 0 !important;
+        padding-bottom: 0 !important;
+    }
+    
+    /* Reduce border container padding - addressing Issue 1 */
+    .product-table div[data-testid="stVerticalBlockBorder"] {
+        padding: 4px 12px !important;
+    }
 
-    st.caption("💡 **Tipp:** Zum Löschen einer Position markieren Sie die Zeile links und drücken die **'Entf'-Taste** (Delete) auf Ihrer Tastatur.")
+    /* Target the specific layout wrapper for height auto issues if needed */
+    div[data-testid="stLayoutWrapper"] {
+        height: auto !important;
+    }
+    
+    /* Fix vertical centering - align all items to same baseline */
+    [data-testid="stVerticalBlock"] [data-testid="stMarkdown"] p {
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1.2;
+    }
+    
+    [data-testid="stVerticalBlock"] [data-testid="stCaptionContainer"] {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Align form inputs */
+    [data-testid="stNumberInput"] > div,
+    [data-testid="stTextInput"] > div,
+    [data-testid="stSelectbox"] > div {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+    }
+    
+    /* Style delete button as plain emoji */
+    button[kind="secondary"]:has([data-testid="baseButton-secondary"]) {
+        background: none !important;
+        border: none !important;
+        padding: 0 !important;
+        font-size: 1.2em;
+        cursor: pointer;
+        color: inherit;
+        box-shadow: none !important;
+    }
+    button[kind="secondary"]:hover {
+        transform: scale(1.2);
+        background: none !important;
+    }
 
-    edited_assets = st.data_editor(
-        st.session_state.assets,
-        num_rows="dynamic",
-        column_config={
-            "Name": st.column_config.TextColumn("Name"),
-            "ISIN / Ticker": st.column_config.TextColumn("ISIN / Ticker", required=True),
-            "Einmalerlag (€)": st.column_config.NumberColumn("Einmalerlag (€)", min_value=0.0),
-            "Sparbetrag (€)": st.column_config.NumberColumn("Sparbetrag (€)", min_value=0.0),
-            "Spar-Intervall": st.column_config.SelectboxColumn("Spar-Intervall", options=["monatlich", "vierteljährlich", "jährlich"], required=True),
-        },
-        hide_index=True,
-        use_container_width=True,
-        key="portfolio_table_editor"
-    )
-    st.session_state.assets = edited_assets
+    /* Special compacting for text inputs in the table */
+    div[data-testid="stTextInput"] input {
+        padding: 4px 8px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Layout für Tabelle (Links 55%, Rechts für Hilfe/Info 45%)
+    col_main, col_spacer = st.columns([0.55, 0.45])
+    
+    with col_main:
+        # Wrapper für das gesamte Product-Table Layout
+        st.markdown('<div class="product-table">', unsafe_allow_html=True)
+        
+        # HEADER ROW - Centered via CSS
+        st.markdown('<div class="table-header">', unsafe_allow_html=True)
+        h1, h2, h3, h4, h5, h6, h7 = st.columns([1.5, 1.5, 1, 1.2, 1.2, 1.2, 0.5])
+        
+        with h1:
+            st.markdown("**Name**")
+        with h2:
+            st.markdown("**ISIN / Ticker**")
+        with h3:
+            st.markdown("**Gewichtung (%)**")
+        with h4:
+            st.markdown("**Einmalbetrag (€)**")
+        with h5:
+            st.markdown("**Sparbetrag (€)**")
+        with h6:
+            st.markdown("**Spar-Intervall**")
+        with h7:
+            st.markdown("")  # Empty for delete button
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # ASSET ROWS
+        for idx, asset in enumerate(st.session_state.assets):
+            name = asset.get('Name', 'Unbekannt')
+            ticker = asset.get('ISIN / Ticker', '')
+            interval = asset.get("Spar-Intervall", "monatlich")
+            
+            # Row mit kompaktem Container
+            with st.container(border=True):
+                c1, c2, c3, c4, c5, c6, c7 = st.columns([1.5, 1.5, 1, 1.2, 1.2, 1.2, 0.5])
+                
+                with c1:
+                    st.markdown(f"{name}")
+                
+                with c2:
+                    st.caption(ticker)
+                
+                with c3:
+                    # Gewichtung als Text-Input (ohne +/-)
+                    w_key = f"weight_text_{idx}"
+                    current_weight = float(asset.get("Gewichtung (%)", 0.0))
+                    
+                    # Callback für Gewichtungs-Änderung
+                    def on_weight_change(asset_idx=idx):
+                        try:
+                            new_val = float(st.session_state[f"weight_text_{asset_idx}"].replace(",", ".").strip())
+                            st.session_state.assets[asset_idx]["Gewichtung (%)"] = new_val
+                            st.session_state.needs_rerun = True
+                        except (ValueError, KeyError):
+                            pass
+                    
+                    st.text_input(
+                        "%",
+                        value=f"{current_weight:.1f}",
+                        key=w_key,
+                        label_visibility="collapsed",
+                        on_change=on_weight_change
+                    )
+                
+                with c4:
+                    # Einmalbetrag editierbar
+                    current_weight = st.session_state.assets[idx].get("Gewichtung (%)", 0.0)
+                    einmalerlag_val = (gesamt_einmalerlag * current_weight) / 100
+                    e_key = f"einmal_text_{idx}"
+                    
+                    # Callback für Einmalbetrag-Änderung
+                    def on_einmal_change(asset_idx=idx, gesamt=gesamt_einmalerlag):
+                        try:
+                            e_clean = st.session_state[f"einmal_text_{asset_idx}"].replace(".", "").replace(",", ".").replace("€", "").strip()
+                            new_e = float(e_clean)
+                            if gesamt > 0:
+                                st.session_state.assets[asset_idx]["Gewichtung (%)"] = (new_e / gesamt) * 100
+                                st.session_state.needs_rerun = True
+                        except (ValueError, KeyError):
+                            pass
+                    
+                    st.text_input(
+                        "€ Einmal",
+                        value=f"{einmalerlag_val:,.0f}".replace(",", "."),
+                        key=e_key,
+                        label_visibility="collapsed",
+                        on_change=on_einmal_change
+                    )
+                
+                with c5:
+                    # Sparbetrag editierbar
+                    current_weight = st.session_state.assets[idx].get("Gewichtung (%)", 0.0)
+                    sparrate_val = (gesamt_sparrate * current_weight) / 100
+                    s_key = f"spar_text_{idx}"
+                    
+                    # Callback für Sparbetrag-Änderung
+                    def on_spar_change(asset_idx=idx, gesamt=gesamt_sparrate):
+                        try:
+                            s_clean = st.session_state[f"spar_text_{asset_idx}"].replace(".", "").replace(",", ".").replace("€", "").strip()
+                            new_s = float(s_clean)
+                            if gesamt > 0:
+                                st.session_state.assets[asset_idx]["Gewichtung (%)"] = (new_s / gesamt) * 100
+                                st.session_state.needs_rerun = True
+                        except (ValueError, KeyError):
+                            pass
+                    
+                    st.text_input(
+                        "€ Spar",
+                        value=f"{sparrate_val:,.0f}".replace(",", "."),
+                        key=s_key,
+                        label_visibility="collapsed",
+                        on_change=on_spar_change
+                    )
+                
+                with c6:
+                    # Spar-Intervall EDITABLE mit Dropdown
+                    interval_options = ["monatlich", "vierteljährlich", "jährlich"]
+                    current_idx = interval_options.index(interval) if interval in interval_options else 0
+                    
+                    # Callback für Intervall-Änderung
+                    def on_interval_change(asset_idx=idx):
+                        st.session_state.assets[asset_idx]["Spar-Intervall"] = st.session_state[f"interval_{asset_idx}"]
+                        st.session_state.needs_rerun = True
+                    
+                    st.selectbox(
+                        "Intervall",
+                        interval_options,
+                        index=current_idx,
+                        key=f"interval_{idx}",
+                        label_visibility="collapsed",
+                        on_change=on_interval_change
+                    )
+                
+                with c7:
+                    # Delete als plain emoji (kein Button-Style)
+                    if st.button("🗑️", key=f"delete_{idx}", help="Titel löschen", use_container_width=False):
+                        st.session_state.assets.pop(idx)
+                        # KEINE automatische Neuverteilung - User behält Kontrolle!
+                        st.session_state.needs_rerun = True
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # --- Gewichtungs-Summe anzeigen (SEHR KOMPAKT, OHNE HINTERGRUND) ---
+    total_weight = sum(a.get("Gewichtung (%)", 0) for a in st.session_state.assets)
+    
+    col_sum, _ = st.columns([0.55, 0.45])
+    with col_sum:
+        # Kompakte Inline-Anzeige OHNE schwarzen Hintergrund
+        delta_val = total_weight - 100
+        status_color = "green" if abs(delta_val) < 0.1 else "red"
+        status_text = "✅ Punktlandung!" if abs(delta_val) < 0.1 else f"⚠️ {delta_val:+.1f}% vom Ziel"
+        
+        st.markdown(
+            f"<div style='padding:6px 0;'>" 
+            f"<span style='font-size:0.85em; color:gray;'>Gesamtgewichtung:</span> "
+            f"<span style='font-size:1.1em; font-weight:bold;'>{total_weight:.1f}%</span> "
+            f"<span style='font-size:0.85em; color:{status_color};'>{status_text}</span>"
+            f"</div>",
+            unsafe_allow_html=True
+        )
+    
+    # --- GEWICHTUNGS-VALIDIERUNG (Sidebar) ---
+    if abs(total_weight - 100) >= 0.1 and len(st.session_state.assets) > 0:
+        with st.sidebar:
+            st.warning(
+                f"### ⚠️ Gewichtung ungültig\n\n"
+                f"Aktuelle Summe: **{total_weight:.1f}%**\n\n"
+                "Die Gesamtgewichtung muss genau 100% ergeben.",
+                icon="📊"
+            )
 
     # --- REACTIVE BUDGET WARNING (Sidebar) ---
-    # Wir berechnen die projizierte Gesamteinzahlung NACH dem Editor, 
-    # damit die Warnung sofort auf Zelländerungen reagiert.
+    # Simulation dates for budget calculation
+    start_date_sim = st.session_state.sim_start_date
+    end_date_sim = st.session_state.sim_end_date
+    months_sim = ((end_date_sim.year - start_date_sim.year) * 12 + (end_date_sim.month - start_date_sim.month))
+    
+    # Wir berechnen die projizierte Gesamteinzahlung NACH dem Editor
     proj_total_invest = 0
-    for a in st.session_state.assets:
-        init_val = a.get("Einmalerlag (€)", 0)
-        rate_val = a.get("Sparbetrag (€)", 0)
+    for idx, a in enumerate(st.session_state.assets):
+        current_w = a.get("Gewichtung (%)", 0)
+        init_val = (gesamt_einmalerlag * current_w) / 100
+        rate_val = (gesamt_sparrate * current_w) / 100
         inter_val = a.get("Spar-Intervall", "monatlich")
         
         asset_total = init_val
@@ -237,9 +444,8 @@ def render():
     if budget_limit > 0 and proj_total_invest > budget_limit:
         with st.sidebar:
             st.error(
-                f"### 🚨 Budget überschritten!\n\n"
-                f"Ihre geplante Investition übersteigt das Kundenbudget.\n\n"
-                f"**Budget:** € {budget_limit:,.0f}\n"
+                f"### 🚨 Budget-Warnung!\n\n"
+                f"**Limit:** € {budget_limit:,.0f}\n"
                 f"**Geplant:** € {proj_total_invest:,.0f}\n"
                 f"**Überschreitung:** € {proj_total_invest - budget_limit:,.0f}\n\n"
                 "Bitte passen Sie die Positionen an, bis die Summe wieder im Rahmen liegt.",
@@ -249,22 +455,122 @@ def render():
                 st.toast(f"⚠️ Budget um € {proj_total_invest - budget_limit:,.0f} überschritten!", icon="🚨")
                 st.session_state.last_warn_val = proj_total_invest
     
-    st.markdown('<div style="margin-bottom: 10px;"></div>', unsafe_allow_html=True)
+    st.markdown('<div style="margin-bottom: 30px;"></div>', unsafe_allow_html=True)
 
-    # --- 2. KOSTEN SETTINGS (Option B: Eigener Toggle statt Popover) ---
+    # =====================================================================
+    # SECTION 2: TOGGLE BUTTONS & FORMS (Below products)
+    # =====================================================================
+    
+    # Toggle state initialization
+    if "show_add_form" not in st.session_state:
+        st.session_state.show_add_form = False
+        
+    def toggle_add_form():
+        st.session_state.show_add_form = not st.session_state.show_add_form
+
     if "show_cost_settings" not in st.session_state:
         st.session_state.show_cost_settings = False
         
     def toggle_cost_settings():
         st.session_state.show_cost_settings = not st.session_state.show_cost_settings
 
-    col_cost_only, _ = st.columns([1, 3])
+    # Beide Buttons nebeneinander
+    col_add_btn, col_cost_btn, col_spacer = st.columns([1.5, 1.5, 1])
     
-    with col_cost_only:
-        # Button, der den Container ein-/ausblendet
-        btn_label = "💸 Kosten Einstellungen verbergen" if st.session_state.show_cost_settings else "💸 Kosten Einstellungen anzeigen"
-        # Wir nutzen hier Secondary Style (default), der durch style.py aber dunkel & grün umrandet ist
-        st.button(btn_label, use_container_width=True, on_click=toggle_cost_settings)
+    with col_add_btn:
+        btn_label_add = "💰 Titel verbergen" if st.session_state.show_add_form else "💰 Titel zum Portfolio hinzufügen"
+        st.button(btn_label_add, use_container_width=True, on_click=toggle_add_form)
+    
+    with col_cost_btn:
+        btn_label_cost = "💸 Kosten verbergen" if st.session_state.show_cost_settings else "💸 Kosten Einstellungen anzeigen"
+        st.button(btn_label_cost, use_container_width=True, on_click=toggle_cost_settings)
+
+
+    # Add Form (wenn sichtbar)
+    if st.session_state.show_add_form:
+        # Callback für Hinzufügen
+        def handle_add_click():
+            name_to_add = ""
+            isin_to_add = ""
+            is_valid = False
+            
+            # Werte aus dem Formular lesen
+            weight_input = st.session_state.widget_add_weight
+            interval = st.session_state.widget_add_interval
+
+            if st.session_state.katalog_auswahl != "Bitte wählen...":
+                name_to_add = st.session_state.katalog_auswahl
+                isin_to_add = KATALOG[st.session_state.katalog_auswahl]
+                is_valid = True
+            elif st.session_state.manuelle_isin:
+                isin_to_add = st.session_state.manuelle_isin
+                with st.spinner(f"Prüfe Ticker {isin_to_add}..."):
+                    is_valid, message_or_name = backend_simulation.validate_and_get_info(isin_to_add)
+                    if is_valid:
+                        name_to_add = message_or_name
+                    else:
+                        st.toast(f"Fehler: {message_or_name}", icon="❌")
+            
+            if is_valid and isin_to_add:
+                # Asset hinzufügen mit Gewichtung
+                gesamt_einmalerlag = st.session_state.handover_data.get("einmalerlag", 0)
+                gesamt_sparrate = st.session_state.handover_data.get("savings_rate", 0)
+                
+                st.session_state.assets.append({
+                    "Name": name_to_add,
+                    "ISIN / Ticker": isin_to_add,
+                    "Gewichtung (%)": weight_input,
+                    "Einmalerlag (€)": (gesamt_einmalerlag * weight_input) / 100,
+                    "Sparbetrag (€)": (gesamt_sparrate * weight_input) / 100,
+                    "Spar-Intervall": interval,
+                })
+                
+                # GLEICHVERTEILUNG: Alle Gewichte neu verteilen
+                num_assets = len(st.session_state.assets)
+                if num_assets > 0:
+                    equal_weight = 100.0 / num_assets
+                    for asset in st.session_state.assets:
+                        asset["Gewichtung (%)"] = equal_weight
+                        asset["Einmalerlag (€)"] = (gesamt_einmalerlag * equal_weight) / 100
+                        asset["Sparbetrag (€)"] = (gesamt_sparrate * equal_weight) / 100
+                
+                st.toast(f"'{name_to_add}' erfolgreich hinzugefügt!", icon="✅")
+                # Reset der Inputs
+                st.session_state.katalog_auswahl = "Bitte wählen..."
+                st.session_state.manuelle_isin = ""
+
+        # Formular - PLATZSPARENDES LAYOUT
+        with st.container(border=True):
+            with st.form(key="add_title_form", clear_on_submit=False):
+                
+                # Zeile 1: Katalog & ISIN - Nutzt 75% der Breite [1.5, 1.5, 1]
+                col_sel1, col_sel2, _ = st.columns([1.5, 1.5, 1])
+                with col_sel1:
+                    st.selectbox("Titel aus Katalog wählen", KATALOG.keys(), key="katalog_auswahl")
+                with col_sel2:
+                    st.text_input("Oder ISIN / Ticker manuell eingeben", key="manuelle_isin", placeholder="z.B. US0378331005")
+                
+                # Zeile 2: Beträge + Button in einer Reihe -> Sehr kompakt
+                col_val1, col_val2, col_val3, col_btn = st.columns([1, 1, 1, 1])
+                with col_val1:
+                    # DEFAULT-Gewichtung berechnen
+                    if len(st.session_state.assets) > 0:
+                        default_weight = 100.0 / (len(st.session_state.assets) + 1)
+                    else:
+                        default_weight = 100.0
+                    st.number_input("Gewichtung (%)", min_value=0.0, max_value=100.0, value=float(default_weight), step=1.0, key="widget_add_weight")
+                with col_val2:
+                    st.selectbox("Intervall", ["monatlich", "vierteljährlich", "jährlich"], key="widget_add_interval")
+                with col_val3:
+                    st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+                with col_btn:
+                    st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
+                    st.form_submit_button("Titel Hinzufügen", use_container_width=True, type="primary", on_click=handle_add_click)
+
+
+
+
+    # --- 2. KOSTEN SETTINGS CONTAINER (only shows when toggled) ---
 
     if st.session_state.show_cost_settings:
         # Container mit Rahmen für bessere Optik
@@ -430,6 +736,12 @@ def render():
 
             # Funktion zum Generieren der PDF
             def generate_pdf_for_download():
+                # VALIDIERUNG: Nur bei 100% Gewichtung
+                total_w = sum(a.get("Gewichtung (%)", 0) for a in st.session_state.assets)
+                if abs(total_w - 100) > 0.1:
+                    st.toast("⚠️ PDF kann nur bei einer Gesamtgewichtung von 100% erstellt werden!", icon="📊")
+                    return
+
                 # 1. Historie Chart neu erstellen (für sauberen Look)
                 fig_hist = plotting.create_simulation_chart(
                     st.session_state.simulations_daten, 
@@ -699,3 +1011,10 @@ def render():
                     st.markdown("---")
                     # PDF BUTTON PROGNOSE
                     show_pdf_download_button("prog")
+    
+    # --- CONDITIONAL RERUN AM ENDE ---
+    # Wenn Input-Felder geändert wurden, triggere einen Rerun
+    # Dies passiert NACH allen Button-Clicks, sodass Buttons nicht unterbrochen werden
+    if st.session_state.needs_rerun:
+        st.session_state.needs_rerun = False
+        st.rerun()
