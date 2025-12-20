@@ -12,6 +12,7 @@ from . import portfolio_logic
 from . import prognose_logic
 from .catalog import KATALOG
 from .pdf_report import generate_pdf_report # NEU: Import für PDF
+from .portfolio_templates import load_portfolio_template, get_portfolio_display_name
 from .style import (
     GUTMANN_ACCENT_GREEN,
     GUTMANN_LIGHT_TEXT,
@@ -34,8 +35,110 @@ def render():
     """
     Rendert den gesamten Inhalt des 'Simulation' Tabs.
     """
+    # --- HEADER: BERATER & KUNDENDATEN (READ-ONLY) ---
+    handover = st.session_state.get("handover_data", {})
+    budget_limit = handover.get("budget", 0)
+
+    # --- BERECHNUNG & SIDE-WARNUNG (REAKTIV) ---
+    # Wir berechnen die projizierte Gesamteinzahlung manuell am Anfang, 
+    # damit die Warnung sofort und konsistent mit den KPIs ist.
+    months_sim = 0
+    if st.session_state.get("sim_start_date") and st.session_state.get("sim_end_date"):
+        s = st.session_state.sim_start_date
+        e = st.session_state.sim_end_date
+        months_sim = (e.year - s.year) * 12 + e.month - s.month
+
+
+
+    # Header-Bereich: Noch kompaktere Namen, größere Portfolio-Übersicht
+    header_col1, header_col2, header_col3 = st.columns([0.5, 0.5, 2])  # 30% schmaler!
     
-    # --- 1. ASSET HANDLING (GANZ OBEN) ---
+    with header_col1:
+        st.markdown("**👤 BERATER**")
+        st.text_input(
+            "Name des Beraters", 
+            value=handover.get("advisor", "Mag. Anna Berger")[:30],
+            disabled=True, 
+            key="ro_advisor",
+            label_visibility="collapsed"
+        )
+    
+    with header_col2:
+        st.markdown("**🤝 KUNDE**")
+        st.text_input(
+            "Name des Kunden", 
+            value=handover.get("client", "Max Mustermann")[:30],
+            disabled=True, 
+            key="ro_client",
+            label_visibility="collapsed"
+        )
+    
+    with header_col3:
+        # Header für Portfolio Bereich
+        st.markdown("**💼 PORTFOLIO-ÜBERSICHT**")
+        
+        # Werte aus Handover-Daten (nicht berechnet!)
+        budget = handover.get("budget", 0)
+        einmalerlag_display = handover.get("einmalerlag", 0)
+        sparrate_display = handover.get("savings_rate", 0)
+        portfolio_type_display = handover.get("portfolio_type", "Manuell")
+        
+        # Premium 2x2 Grid mit Rahmen
+        with st.container(border=True):
+            r1c1, r1c2 = st.columns(2)
+            r2c1, r2c2 = st.columns(2)
+            
+            with r1c1:
+                st.metric("Budget", f"€ {budget:,.0f}")
+            with r1c2:
+                st.metric("Einmalerlag", f"€ {einmalerlag_display:,.0f}")
+            
+            with r2c1:
+                st.metric("Sparrate", f"€ {sparrate_display:,.0f}")
+            with r2c2:
+                # Truncate portfolio name if too long
+                trunc_type = portfolio_type_display
+                if len(trunc_type) > 15:
+                    # Suche nach Klammer oder kürze hart
+                    if "(" in trunc_type:
+                        trunc_type = trunc_type.split("(")[0].strip()
+                    else:
+                        trunc_type = trunc_type[:12] + "..."
+                
+                st.metric("Portfolio Type", trunc_type)
+    
+    st.markdown("---")
+
+    # Budget Limit für spätere Verwendung (Sidebar Warnung)
+    budget_limit = handover.get("budget", 0)
+    
+    # --- AUTO-LOADING LOGIC (nur beim ersten Render) ---
+    if (handover.get("portfolio_type") and not handover.get("preloaded")):
+        portfolio_type = handover["portfolio_type"]
+        einmalerlag_for_loading = handover.get("einmalerlag", 0)
+        savings_rate = handover.get("savings_rate", 0)
+        savings_interval = handover.get("savings_interval", "monatlich")
+        
+        # Portfolio-Template laden
+        loaded_assets = load_portfolio_template(
+            portfolio_type, 
+            einmalerlag_for_loading,
+            savings_rate,
+            savings_interval
+        )
+        
+        if loaded_assets:
+            # Assets zur bestehenden Liste hinzufügen (NICHT ersetzen für Hybrid-Modus)
+            st.session_state.assets.extend(loaded_assets)
+            
+            # Flag setzen, damit es nur einmal lädt
+            st.session_state.handover_data["preloaded"] = True
+            
+            # Popup-Feedback statt permanentem Banner
+            portfolio_display_name = get_portfolio_display_name(portfolio_type)
+            st.toast(f"Basis-Portfolio '{portfolio_display_name}' wurde geladen.", icon="✅")
+    
+    # --- 1. ASSET HANDLING ---
     st.subheader("💰 Titel zum Portfolio hinzufügen")
     
     # Callback für Hinzufügen
@@ -115,6 +218,36 @@ def render():
         key="portfolio_table_editor"
     )
     st.session_state.assets = edited_assets
+
+    # --- REACTIVE BUDGET WARNING (Sidebar) ---
+    # Wir berechnen die projizierte Gesamteinzahlung NACH dem Editor, 
+    # damit die Warnung sofort auf Zelländerungen reagiert.
+    proj_total_invest = 0
+    for a in st.session_state.assets:
+        init_val = a.get("Einmalerlag (€)", 0)
+        rate_val = a.get("Sparbetrag (€)", 0)
+        inter_val = a.get("Spar-Intervall", "monatlich")
+        
+        asset_total = init_val
+        if inter_val == "monatlich": asset_total += rate_val * months_sim
+        elif inter_val == "vierteljährlich": asset_total += rate_val * (months_sim // 3)
+        elif inter_val == "jährlich": asset_total += rate_val * (months_sim // 12)
+        proj_total_invest += asset_total
+
+    if budget_limit > 0 and proj_total_invest > budget_limit:
+        with st.sidebar:
+            st.error(
+                f"### 🚨 Budget überschritten!\n\n"
+                f"Ihre geplante Investition übersteigt das Kundenbudget.\n\n"
+                f"**Budget:** € {budget_limit:,.0f}\n"
+                f"**Geplant:** € {proj_total_invest:,.0f}\n"
+                f"**Überschreitung:** € {proj_total_invest - budget_limit:,.0f}\n\n"
+                "Bitte passen Sie die Positionen an, bis die Summe wieder im Rahmen liegt.",
+                icon="🚨"
+            )
+            if "last_warn_val" not in st.session_state or st.session_state.last_warn_val != proj_total_invest:
+                st.toast(f"⚠️ Budget um € {proj_total_invest - budget_limit:,.0f} überschritten!", icon="🚨")
+                st.session_state.last_warn_val = proj_total_invest
     
     st.markdown('<div style="margin-bottom: 10px;"></div>', unsafe_allow_html=True)
 
@@ -149,9 +282,9 @@ def render():
     simulation_successful = False
     
     # Check if calculation is needed (Assets changed, dates changed, or results missing)
-    # create a hash or a list of relevant keys to detect changes
+    # WICHTIG: list(...) Erzeugt eine Kopie, damit Änderungen erkannt werden!
     calc_relevant_state = {
-        "assets": st.session_state.assets,
+        "assets": list(st.session_state.assets), 
         "start_date": st.session_state.sim_start_date,
         "end_date": st.session_state.sim_end_date,
         "ausgabe": st.session_state.cost_ausgabe,
@@ -182,6 +315,7 @@ def render():
                      st.session_state.simulations_daten = sim_data
                      st.session_state.historical_returns_pa = hist_returns
                      st.session_state.asset_final_values = final_values
+                     st.session_state.last_calc_state = calc_relevant_state # Update state nach Erfolg
                      
                      for name, value in hist_returns.items():
                         if name not in st.session_state.prognosis_assumptions_pa:
@@ -432,6 +566,7 @@ def render():
                 st.markdown("---")
                 # PDF BUTTON HISTORIE
                 show_pdf_download_button("hist")
+
 
 
         # === SUB-TAB: ZUKUNFTSPROGNOSE ===

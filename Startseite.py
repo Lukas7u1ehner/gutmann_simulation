@@ -13,6 +13,57 @@ except ImportError:
 
 st.set_page_config(page_title="Simulation | Gutmann", page_icon="📈", layout="wide")
 
+# --- URL-PARAMETER-HANDLING (Tool A -> Tool B Simulation) ---
+# Für FH-Projekt: Simul iert die Übergabe von Beraterdaten aus Tool A
+try:
+    query_params = st.query_params
+    
+    # Parameter extrahieren (mit Fallback auf Dummy-Daten)
+    advisor_name = query_params.get("advisorName", "Mag. Anna Berger")
+    client_name = query_params.get("clientName", "Max Mustermann")  
+    budget_str = query_params.get("budget", "25000")
+    einmalerlag_str = query_params.get("einmalerlag", "0")  # NEU: Gesamt-Einmalerlag für Portfolio
+    portfolio_type = query_params.get("portfolioType", None)  # None = kein Auto-Loading
+    savings_rate_str = query_params.get("savingsRate", "0")
+    savings_interval = query_params.get("savingsInterval", "monatlich")
+    
+    # Konvertierung zu Zahlen
+    try:
+        budget = float(budget_str)
+        einmalerlag = float(einmalerlag_str)
+        savings_rate = float(savings_rate_str)
+    except ValueError:
+        budget = 25000.0
+        einmalerlag = 0.0
+        savings_rate = 0.0
+    
+    # In Session State speichern (nur einmal beim ersten Laden)
+    if "handover_data" not in st.session_state:
+        st.session_state.handover_data = {
+            "advisor": advisor_name,
+            "client": client_name,
+            "budget": budget,
+            "einmalerlag": einmalerlag,  # NEU: Gesamteinmalerlag
+            "portfolio_type": portfolio_type,
+            "savings_rate": savings_rate,
+            "savings_interval": savings_interval,
+            "preloaded": False  # Flag für einmaliges Auto-Loading
+        }
+except Exception as e:
+    # Fallback bei Fehler: Dummy-Daten setzen
+    if "handover_data" not in st.session_state:
+        st.session_state.handover_data = {
+            "advisor": "Mag. Anna Berger",
+            "client": "Max Mustermann",
+            "budget": 25000.0,
+            "einmalerlag": 0.0,
+            "portfolio_type": None,
+            "savings_rate": 0.0,
+            "savings_interval": "monatlich",
+            "preloaded": False
+        }
+# ------------------------------------------------------
+
 try:
     from src.style import (
         apply_gutmann_style,
