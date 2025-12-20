@@ -88,31 +88,24 @@ def render():
         sparrate_display = handover.get("savings_rate", 0)
         portfolio_type_display = handover.get("portfolio_type", "Manuell")
         
-        # Premium 2x2 Grid mit Rahmen
+        # Premium 1x4 Grid (eine Reihe)
         with st.container(border=True):
-            r1c1, r1c2 = st.columns(2)
-            r2c1, r2c2 = st.columns(2)
+            r1c1, r1c2, r1c3, r1c4 = st.columns(4)
             
             with r1c1:
                 st.metric("Budget", f"€ {budget:,.0f}")
             with r1c2:
                 st.metric("Einmalerlag", f"€ {einmalerlag_display:,.0f}")
-            
-            with r2c1:
+            with r1c3:
                 st.metric("Sparrate", f"€ {sparrate_display:,.0f}")
-            with r2c2:
-                # Truncate portfolio name if too long
+            with r1c4:
                 trunc_type = str(portfolio_type_display) if portfolio_type_display else "Manuell"
                 if len(trunc_type) > 15:
-                    # Suche nach Klammer oder kürze hart
                     if "(" in trunc_type:
                         trunc_type = trunc_type.split("(")[0].strip()
                     else:
                         trunc_type = trunc_type[:12] + "..."
-                
-                st.metric("Portfolio Type", trunc_type)
-    
-    st.markdown("---")
+                st.metric("Portfolio Type", trunc_type) # Umbenannt von Art -> Portfolio Type
 
     # Budget Limit für spätere Verwendung (Sidebar Warnung)
     budget_limit = handover.get("budget", 0)
@@ -161,7 +154,7 @@ def render():
     # SECTION 1: EMPFOHLENE PRODUKTE (Main product table)
     # =====================================================================
     
-    st.subheader("Empfohlene Produkte")
+    # st.subheader("Empfohlene Produkte")  <-- GELÖSCHT V4
     
     # Hilfsfunktion: Gewichte neu berechnen wenn sich etwas ändert
     gesamt_einmalerlag = handover.get("einmalerlag", 0)
@@ -320,23 +313,12 @@ def render():
                     einmalerlag_val = (gesamt_einmalerlag * current_weight) / 100
                     e_key = f"einmal_text_{idx}"
                     
-                    # Callback für Einmalbetrag-Änderung
-                    def on_einmal_change(asset_idx=idx, gesamt=gesamt_einmalerlag):
-                        try:
-                            e_clean = st.session_state[f"einmal_text_{asset_idx}"].replace(".", "").replace(",", ".").replace("€", "").strip()
-                            new_e = float(e_clean)
-                            if gesamt > 0:
-                                st.session_state.assets[asset_idx]["Gewichtung (%)"] = (new_e / gesamt) * 100
-                                st.session_state.needs_rerun = True
-                        except (ValueError, KeyError):
-                            pass
-                    
                     st.text_input(
                         "€ Einmal",
                         value=f"{einmalerlag_val:,.0f}".replace(",", "."),
                         key=e_key,
                         label_visibility="collapsed",
-                        on_change=on_einmal_change
+                        # on_change=on_einmal_change  <-- DEACTIVATED V4
                     )
                 
                 with c5:
@@ -345,23 +327,12 @@ def render():
                     sparrate_val = (gesamt_sparrate * current_weight) / 100
                     s_key = f"spar_text_{idx}"
                     
-                    # Callback für Sparbetrag-Änderung
-                    def on_spar_change(asset_idx=idx, gesamt=gesamt_sparrate):
-                        try:
-                            s_clean = st.session_state[f"spar_text_{asset_idx}"].replace(".", "").replace(",", ".").replace("€", "").strip()
-                            new_s = float(s_clean)
-                            if gesamt > 0:
-                                st.session_state.assets[asset_idx]["Gewichtung (%)"] = (new_s / gesamt) * 100
-                                st.session_state.needs_rerun = True
-                        except (ValueError, KeyError):
-                            pass
-                    
                     st.text_input(
                         "€ Spar",
                         value=f"{sparrate_val:,.0f}".replace(",", "."),
                         key=s_key,
                         label_visibility="collapsed",
-                        on_change=on_spar_change
+                        # on_change=on_spar_change  <-- DEACTIVATED V4
                     )
                 
                 with c6:
@@ -742,7 +713,19 @@ def render():
                     st.toast("⚠️ PDF kann nur bei einer Gesamtgewichtung von 100% erstellt werden!", icon="📊")
                     return
 
-                # 1. Historie Chart neu erstellen (für sauberen Look)
+                # 0. Datums-Bereiche formatieren
+                start_hist = st.session_state.sim_start_date.strftime("%d.%m.%Y")
+                end_hist = st.session_state.sim_end_date.strftime("%d.%m.%Y")
+                range_hist_str = f"Zeitraum: {start_hist} - {end_hist}"
+                
+                # Prognose: Von Heute bis (Heute + Jahre)
+                today = date.today()
+                future_year = today.year + st.session_state.prognose_jahre
+                # Einfache Annahme: Gleicher Tag/Monat in Zukunft
+                end_prog = today.replace(year=future_year)
+                range_prog_str = f"Zeitraum: {today.strftime('%d.%m.%Y')} - {end_prog.strftime('%d.%m.%Y')}"
+                
+                # 1. Historie Chart neu erstellen
                 fig_hist = plotting.create_simulation_chart(
                     st.session_state.simulations_daten, 
                     None, 
@@ -759,6 +742,17 @@ def render():
                         title="Zukunftsprognose"
                     )
                 
+                # OPTIMISTISCH / PESSIMISTISCH ERGÄNZEN
+                if prog_kpis_dict and st.session_state.prognose_daten is not None:
+                     last_row_p = st.session_state.prognose_daten.iloc[-1]
+                     # Werte formatieren (Keys müssen mit prognose_logic.py übereinstimmen!)
+                     val_opt = last_row_p.get('Portfolio (BestCase)', 0) # War 'Portfolio (Optimistisch)'
+                     val_pess = last_row_p.get('Portfolio (WorstCase)', 0) # War 'Portfolio (Pessimistisch)'
+                     
+                     # Ins Dictionary einfügen (an passender Stelle oder unten dran)
+                     prog_kpis_dict["Endkapital (Optimistisch)"] = f"EUR {val_opt:,.2f}"
+                     prog_kpis_dict["Endkapital (Pessimistisch)"] = f"EUR {val_pess:,.2f}"
+
                 try:
                     pdf_bytes = generate_pdf_report(
                         assets=st.session_state.assets,
@@ -766,7 +760,12 @@ def render():
                         hist_fig=fig_hist,
                         hist_kpis=hist_kpis_dict,
                         prog_fig=fig_prog,
-                        prog_kpis=prog_kpis_dict
+                        prog_kpis=prog_kpis_dict,
+                        handover_data=st.session_state.handover_data,
+                        hist_returns=st.session_state.historical_returns_pa,
+                        prog_returns=st.session_state.prognosis_assumptions_pa,
+                        date_range_hist=range_hist_str,
+                        date_range_prog=range_prog_str
                     )
                     st.session_state[f"pdf_data_{key_suffix}"] = pdf_bytes
                     st.session_state[f"pdf_trigger_{key_suffix}"] = True

@@ -35,18 +35,26 @@ Alle ausgewiesenen Kurse und Werte wurden mit größtmöglicher Sorgfalt aus als
 Die Bank Gutmann AG übernimmt keine Haftung für die Richtigkeit, Aktualität oder Vollständigkeit der in dieser Aufstellung enthaltenen Informationen. Eine Haftung für Folgen, die aus der Nutzung dieser Angaben oder aus darauf basierenden Entscheidungen entstehen, ist ausgeschlossen."""
 
 GLOSSAR_TEXT = {
-    "Startkapital": "Kapital, das zu Beginn der Simulation einmalig investiert wird.",
-    "Sparrate (monatlich)": "Regelmäßiger Betrag, der gemäß Intervall zusätzlich investiert wird.",
-    "Historische Simulation": "Rückblickende Berechnung auf Basis historischer Kursdaten im gewählten Zeitraum. Zeigt, wie sich das Portfolio in der Vergangenheit unter realen Marktbedingungen entwickelt hätte.",
-    "Zukunftsprognose / Monte Carlo": "Simulation tausender möglicher zukünftiger Entwicklungen basierend auf statistischen Rendite- und Risikoannahmen (Volatilität).",
-    "Median-Prognose": "Der statistisch wahrscheinlichste Pfad (Median). 50 % der simulierten Szenarien verlaufen besser, 50 % schlechter.",
-    "Nominal vs. Real": "Nominal: Reiner Geldwert ohne Berücksichtigung der Inflation.\nReal: Inflationsbereinigter Wert (Kaufkraft) basierend auf historischen Inflationsdaten oder Modellannahmen."
+    "Startkapital": "Das Kapital, welches zu Beginn der Simulation einmalig in das Portfolio investiert wird.",
+    "Sparrate (monatlich)": "Ein regelmäßiger Investitionsbetrag, der im gewählten Intervall (z.B. monatlich) zum Portfolio hinzugefügt wird.",
+    "Historische Simulation": "Eine Analyse, die zeigt, wie sich das definierte Portfolio in einem vergangenen Zeitraum entwickelt hätte. Dabei werden reale, historische Marktdaten verwendet, um die Performance unter echten Marktbedingungen zu veranschaulichen.",
+    "Zukunftsprognose (Monte Carlo)": "Eine statistische Simulationstechnik, die tausende möglicher zukünftiger Marktentwicklungen berechnet. Sie basiert auf den erwarteten Renditen und der Volatilität (Schwankungsbreite) der Portfolio-Bausteine.",
+    "Median-Prognose": "Der mittlere Entwicklungspfad der Zukunftssimulation. Das bedeutet, dass die Wahrscheinlichkeit für ein besseres oder schlechteres Ergebnis jeweils bei 50 % liegt. Dies ist das statistisch wahrscheinlichste Szenario.",
+    "Nominal vs. Real": "Nominal bezeichnet den reinen Geldwert ohne Berücksichtigung der Geldentwertung (Inflation).\nReal bezeichnet den um die Inflation bereinigten Wert, der die tatsächliche Kaufkraft widerspiegelt.",
+    "Volatilität": "Ein Maß für die Schwankungsbreite eines Wertpapierkurses. Eine höhere Volatilität bedeutet größere Kursschwankungen und damit potenziell höheres Risiko, aber auch höhere Chancen.",
+    "Rendite": "Der Gesamtertrag einer Kapitalanlage, ausgedrückt in Prozent pro Jahr (p.a.) oder als absoluter Wert, unter Berücksichtigung von Kursgewinnen und Ausschüttungen.",
+    "Gewichtung": "Der prozentuale Anteil einer einzelnen Position am Gesamtportfolio. Die Summe aller Gewichtungen ergibt idealerweise 100 %.",
+    "ISIN": "International Securities Identification Number. Eine zwölftstellige Buchstaben- und Zahlenkombination, die ein Wertpapier eindeutig identifiziert."
 }
+# Sortieren nach Alphabet
+GLOSSAR_TEXT = dict(sorted(GLOSSAR_TEXT.items()))
 
 class GutmannReport(FPDF):
     def __init__(self):
         super().__init__(orientation='P', unit='mm', format='A4')
         self.set_auto_page_break(auto=True, margin=20)
+        # CRITICAL FIX: Kompression deaktivieren, damit Placeholder im Byte-Stream gefunden wird
+        self.set_compression(False)
         self.alias_nb_pages() # Für Gesamtseitenzahl
 
     def header(self):
@@ -73,12 +81,12 @@ class GutmannReport(FPDF):
             self.set_font("Helvetica", size=8)
             self.set_text_color(*COLOR_TEXT_GREY)
             
-            # Logische Seitennummerierung: Deckblatt zählt nicht mit
-            # Seite 2 im PDF = Seite 1 im Report
+
+            # Logische Seitennummerierung: Deckblatt zählt nicht mit (Start bei 1 auf physischer Seite 2)
             current_vis_page = self.page_no() - 1
-            # {nb} ist der Platzhalter für Gesamtseiten (muss man ggf. manuell korrigieren, 
-            # aber fpdf macht das meist relativ zur physischen Seite. Wir lassen "von X" hier weg oder nutzen nur "Seite X")
-            self.cell(0, 10, f"Seite {current_vis_page}", align="C")
+            
+            # {nb_true} ist unser eigener Placeholder, den wir am Ende ersetzen
+            self.cell(0, 10, f"Seite {current_vis_page} von {{nb_true}}", align="C")
 
     def section_title(self, title):
         self.set_font("Helvetica", "B", 16)
@@ -93,54 +101,108 @@ class GutmannReport(FPDF):
 
     def create_title_page(self):
         self.add_page()
-        # Dunkler Hintergrund
+        # Voller Hintergrund (kein weißer Balken mehr)
         self.set_fill_color(*COLOR_DARK_GREEN)
         self.rect(0, 0, 210, 297, "F")
         
-        # Weißer Balken für Logo
-        self.set_fill_color(255, 255, 255)
-        self.rect(0, 40, 210, 60, "F")
+        # Logo zentriert im oberen Drittel
         if os.path.exists(LOGO_PATH):
-            self.image(LOGO_PATH, x=65, y=52, w=80)
+            # Wir nehmen an, dass das Logo transparent ist oder auf dunklem Grund gut aussieht.
+            # Falls es einen weißen Rand hat, wäre ein transparentes PNG besser.
+            self.image(LOGO_PATH, x=55, y=50, w=100)
         
         self.ln(130)
         
         # Titel
         self.set_text_color(255, 255, 255)
-        self.set_font("Helvetica", "B", 36)
-        self.multi_cell(0, 18, "Wertpapierplan\nSimulation Report", align="C")
+        self.set_font("Helvetica", "B", 34)
+        self.multi_cell(0, 16, clean_text("Wertpapierplan\nSimulation Report"), align="C")
         
-        self.ln(10)
+        # Trennlinie
+        self.set_draw_color(*COLOR_ACCENT_GREEN)
+        self.set_line_width(1)
+        self.line(70, self.get_y() + 5, 140, self.get_y() + 5)
+        
+        self.ln(20)
         self.set_font("Helvetica", "", 14)
         self.set_text_color(*COLOR_ACCENT_GREEN)
         self.cell(0, 10, clean_text("Historische Simulation & Zukunftsprognose"), align="C", new_x="LMARGIN", new_y="NEXT")
         
-        self.ln(40)
+        self.ln(45)
         self.set_font("Helvetica", "", 10)
-        self.set_text_color(200, 200, 200)
+        self.set_text_color(180, 180, 180)
         now = datetime.now().strftime("%d.%m.%Y, %H:%M Uhr")
         self.cell(0, 10, f"Erstellt am: {now}", align="C", new_x="LMARGIN", new_y="NEXT")
 
-    def create_portfolio_page(self, assets, params):
+    def create_portfolio_page(self, assets, params, handover_data=None):
         self.add_page()
         self.section_title("1. Portfolio & Eingaben")
         
-        # Settings Block (Schönere Darstellung)
+        # --- ZENTRALISIERTES INFO-COCKPIT ---
+        if handover_data:
+            self.set_font("Helvetica", "", 11)
+            self.set_text_color(0, 0, 0)
+            
+            # Daten vorbereiten
+            client = handover_data.get('client', '-')
+            advisor = handover_data.get('advisor', '-')
+            budget_v = f"{handover_data.get('budget', 0):,.2f}"
+            einmal_v = f"{handover_data.get('einmalerlag', 0):,.2f}"
+            spar_v   = f"{handover_data.get('savings_rate', 0):,.2f}"
+            portfolio_type = handover_data.get('portfolio_type') # FIX: Define variable
+            
+            # 2-Spalten Layout: Links Personen, Rechts Zahlen
+            col_w = 90
+            start_x = 15
+            
+            # Erste Zeile
+            y_start = self.get_y()
+            
+            # Labels fett, Werte normal
+            def print_key_val(label, value, x_offset):
+                self.set_x(x_offset)
+                self.set_font("Helvetica", "B", 10)
+                self.set_text_color(*COLOR_DARK_GREEN)
+                self.cell(40, 6, label, 0)
+                self.set_font("Helvetica", "", 10)
+                self.set_text_color(0, 0, 0)
+                self.cell(50, 6, value, 0)
+
+            # Block 1 (Links)
+            print_key_val("Kunde:", clean_text(client), start_x)
+            # Block 2 (Rechts)
+            print_key_val("Budget:", f"EUR {budget_v}", start_x + col_w + 10)
+            self.ln(6)
+            
+            # Zweite Zeile
+            print_key_val("Berater:", clean_text(advisor), start_x)
+            print_key_val("Einmalerlag:", f"EUR {einmal_v}", start_x + col_w + 10)
+            self.ln(6)
+            
+            # Dritte Zeile
+            print_key_val("Sparrate (Gesamt):", f"EUR {spar_v}", start_x + col_w + 10)
+            print_key_val("Portfolio Typ:", clean_text(portfolio_type) if portfolio_type else "Manuell", start_x) # NEW V4
+            self.ln(12)
+
+        # Settings Block (Kompakter & Vertikal)
         self.set_font("Helvetica", "B", 11)
         self.set_text_color(*COLOR_DARK_GREEN)
-        self.cell(0, 10, "Einstellungen", new_x="LMARGIN", new_y="NEXT")
+        # RENAMED HEADER
+        self.cell(0, 8, "Kosten", new_x="LMARGIN", new_y="NEXT")
         
         self.set_font("Helvetica", "", 10)
         self.set_text_color(0, 0, 0)
         
-        # Einfache Liste statt Tabelle für Settings
+        # Parameter UNTEREINANDER (Vertical List)
+        # Filtern: Prognose-Horizont raus
         for k, v in params.items():
-            self.cell(60, 6, clean_text(k), border=0)
-            self.set_font("Helvetica", "B", 10)
-            self.cell(0, 6, clean_text(v), border=0, new_x="LMARGIN", new_y="NEXT")
-            self.set_font("Helvetica", "", 10)
+            if "Prognose-Horizont" in k:
+                continue
+            # Bullet point style
+            self.cell(5, 6, "-", border=0) 
+            self.cell(0, 6, f"{clean_text(k)}: {clean_text(v)}", border=0, new_x="LMARGIN", new_y="NEXT")
             
-        self.ln(10)
+        self.ln(8)
         
         # Positionen Tabelle
         self.set_font("Helvetica", "B", 11)
@@ -152,11 +214,14 @@ class GutmannReport(FPDF):
         self.set_text_color(0, 0, 0)
         self.set_font("Helvetica", "B", 9)
         
-        cols = [70, 30, 30, 30, 30] 
-        headers = ["Name", "ISIN", "Start (EUR)", "Sparrate", "Intervall"]
+        # Breiten angepasst für Gewichtung
+        cols = [60, 30, 25, 25, 25, 25] 
+        headers = ["Name", "ISIN", "Gewichtung", "Start (EUR)", "Sparrate", "Intervall"]
         
         for i, h in enumerate(headers):
-            self.cell(cols[i], 8, h, border="B", fill=True)
+            # ZENTRIERT (außer Name)
+            align = "C" if i > 0 else "L"
+            self.cell(cols[i], 8, clean_text(h), border="B", fill=True, align=align)
         self.ln()
         
         # Body
@@ -164,20 +229,51 @@ class GutmannReport(FPDF):
         for asset in assets:
             if not asset.get("ISIN / Ticker"): continue
             
-            name = clean_text(asset.get("Name", ""))[:40]
+            name = clean_text(asset.get("Name", ""))[:35]
             isin = clean_text(asset.get("ISIN / Ticker", ""))
+            weight = f"{asset.get('Gewichtung (%)', 0):.1f} %"
             start = f"{asset.get('Einmalerlag (€)', 0):,.2f}"
             spar = f"{asset.get('Sparbetrag (€)', 0):,.2f}"
             inter = clean_text(asset.get("Spar-Intervall", ""))[:10]
             
-            data = [name, isin, start, spar, inter]
-            aligns = ["L", "L", "R", "R", "L"]
+            data = [name, isin, weight, start, spar, inter]
+            # ZENTRIERT (außer Name)
+            aligns = ["L", "C", "C", "C", "C", "C"]
             
             for i, d in enumerate(data):
                 self.cell(cols[i], 8, d, border="B", align=aligns[i])
             self.ln()
 
-    def create_chart_page(self, title, chart_bytes, kpi_dict, note=None):
+    def create_returns_table(self, title, returns_data, suffix_label="(p.a.)"):
+        """Erstellt eine Tabelle für Renditen (Historisch oder Prognose)"""
+        if not returns_data:
+            return
+            
+        self.ln(10)
+        self.set_font("Helvetica", "B", 11)
+        self.set_text_color(*COLOR_DARK_GREEN)
+        self.cell(0, 8, clean_text(title), new_x="LMARGIN", new_y="NEXT")
+        
+        # Einfache Tabelle - TIGHT LAYOUT (Schmäler)
+        col_name_w = 90  # War 120
+        col_val_w = 30   # War 40
+        
+        self.set_font("Helvetica", "B", 9)
+        self.set_fill_color(*COLOR_LIGHT_GREY)
+        self.cell(col_name_w, 7, "Asset / Position", border="B", fill=True)
+        self.cell(col_val_w, 7, f"Rendite {suffix_label}", border="B", fill=True, align="R")
+        self.ln()
+        
+        self.set_font("Helvetica", "", 9)
+        self.set_text_color(0, 0, 0)
+        
+        for name, val in returns_data.items():
+            val_str = f"{val:.2f} %"
+            self.cell(col_name_w, 7, clean_text(name)[:60], border="B")
+            self.cell(col_val_w, 7, val_str, border="B", align="R")
+            self.ln()
+
+    def create_chart_page(self, title, chart_bytes, kpi_dict, note=None, detailed_returns=None, detailed_returns_title="Rendite-Details", date_range=None):
         """Generische Seite für Historie & Prognose mit Chart und KPI-Tabelle"""
         self.add_page()
         self.section_title(title)
@@ -188,7 +284,7 @@ class GutmannReport(FPDF):
                 tmp.write(chart_bytes)
                 tmp_path = tmp.name
             try:
-                self.image(tmp_path, x=10, w=190)
+                self.image(tmp_path, x=10, w=190, h=95) # Fixierte Höhe für Layout-Konsistenz
             finally:
                 if os.path.exists(tmp_path):
                     os.unlink(tmp_path)
@@ -198,6 +294,9 @@ class GutmannReport(FPDF):
         
         self.ln(5)
         
+        # 2-Spalten Layout: Links KPIs, Rechts Details (falls vorhanden)
+        y_start = self.get_y()
+        
         # KPI Tabelle (Grüne Linien Style)
         if kpi_dict:
             self.set_font("Helvetica", "B", 11)
@@ -205,7 +304,14 @@ class GutmannReport(FPDF):
             
             # Titel je nach Kontext erraten oder fix setzen
             table_title = "Ergebnisse & Kennzahlen"
-            self.cell(0, 10, table_title, new_x="LMARGIN", new_y="NEXT")
+            self.cell(0, 8, table_title, new_x="LMARGIN", new_y="NEXT")
+            
+            # DATE RANGE SUBTITLE (falls vorhanden)
+            if date_range:
+                self.set_font("Helvetica", "I", 10)
+                self.set_text_color(100, 100, 100)
+                self.cell(0, 6, date_range, new_x="LMARGIN", new_y="NEXT")
+                self.ln(2)
             
             self.set_draw_color(*COLOR_ACCENT_GREEN)
             self.set_line_width(0.4)
@@ -213,13 +319,17 @@ class GutmannReport(FPDF):
             for k, v in kpi_dict.items():
                 self.set_font("Helvetica", "", 10)
                 self.set_text_color(0, 0, 0) # Schwarz
-                self.cell(100, 8, clean_text(k), border="B") # Label
+                self.cell(100, 7, clean_text(k), border="B") # Label
                 
                 self.set_font("Helvetica", "B", 10)
-                self.cell(0, 8, clean_text(v), border="B", align="R", new_x="LMARGIN", new_y="NEXT") # Wert
+                self.cell(0, 7, clean_text(v), border="B", align="R", new_x="LMARGIN", new_y="NEXT") # Wert
+                
+        # Wenn detaillierte Renditen im Argument sind, Tabelle anzeigen
+        if detailed_returns:
+            self.create_returns_table(detailed_returns_title, detailed_returns)
         
         if note:
-            self.ln(5)
+            self.ln(10)
             self.set_font("Helvetica", "I", 9)
             self.set_text_color(*COLOR_TEXT_GREY)
             self.multi_cell(0, 5, clean_text(note))
@@ -247,21 +357,22 @@ class GutmannReport(FPDF):
         self.add_page()
         self.section_title("5. Rechtliche Hinweise")
         
-        self.set_font("Helvetica", "", 9)
+        # Größere Schrift (10pt statt 9pt)
+        self.set_font("Helvetica", "", 10)
         self.set_text_color(*COLOR_TEXT_GREY)
         
         paragraphs = clean_text(DISCLAIMER_TEXT).split('\n\n')
         for p in paragraphs:
-            self.multi_cell(0, 5, p)
-            self.ln(5)
+            self.multi_cell(0, 6, p) # Mehr Zeilenhöhe
+            self.ln(6)
 
 
-def generate_pdf_report(assets, global_params, hist_fig, hist_kpis, prog_fig, prog_kpis):
+def generate_pdf_report(assets, global_params, hist_fig, hist_kpis, prog_fig, prog_kpis, handover_data=None, hist_returns=None, prog_returns=None, date_range_hist=None, date_range_prog=None):
     pdf = GutmannReport()
     
     # 1. Deckblatt & Portfolio
     pdf.create_title_page()
-    pdf.create_portfolio_page(assets, global_params)
+    pdf.create_portfolio_page(assets, global_params, handover_data)
     
     # 2. Historie
     hist_img = None
@@ -271,7 +382,7 @@ def generate_pdf_report(assets, global_params, hist_fig, hist_kpis, prog_fig, pr
         # Breiteres Bild für bessere Lesbarkeit im PDF
         hist_img = img_fig.to_image(format="png", width=1400, height=750, scale=2)
     
-    pdf.create_chart_page("2. Historische Simulation", hist_img, hist_kpis)
+    pdf.create_chart_page("2. Historische Simulation", hist_img, hist_kpis, detailed_returns=hist_returns, detailed_returns_title="Historische Renditen (Positionen)", date_range=date_range_hist)
     
     # 3. Prognose
     prog_img = None
@@ -284,7 +395,17 @@ def generate_pdf_report(assets, global_params, hist_fig, hist_kpis, prog_fig, pr
         # Hinweis, falls Daten fehlen (weil nicht berechnet)
         prog_note = "Hinweis: Keine Prognosedaten verfügbar. Bitte 'Zukunftsprognose'-Tab öffnen, um Berechnung zu starten."
 
-    pdf.create_chart_page("3. Zukunftsprognose (Monte Carlo)", prog_img, prog_kpis, note=prog_note)
+    prog_title = "3. Zukunftsprognose (Monte Carlo)"
+
+    pdf.create_chart_page(
+        prog_title, 
+        prog_img, 
+        prog_kpis, 
+        note=prog_note, 
+        detailed_returns=prog_returns,
+        detailed_returns_title="Erwartete Renditen (Annahmen p.a.)",
+        date_range=date_range_prog
+    )
     
     # 4. Glossar (NEU)
     pdf.create_glossary_page()
@@ -292,4 +413,21 @@ def generate_pdf_report(assets, global_params, hist_fig, hist_kpis, prog_fig, pr
     # 5. Rechtliches
     pdf.create_disclaimer_page()
     
-    return bytes(pdf.output())
+    # --- PAGE COUNT POST-PROCESSING ---
+    # Ersetze den Platzhalter {nb_true} mit der tatsächlichen Seitenanzahl minus 1 (Deckblatt)
+    final_content_pages = pdf.page_no() - 1
+    
+    # pdf.output(dest='S') liefert in fpdf2/modernem fpdf meist bytes zurück
+    output_bytes = pdf.output(dest='S')
+    
+    # Platzhalter auf Byte-Ebene ersetzen, um TypeError zu vermeiden
+    placeholder = "{nb_true}".encode('latin-1')
+    replacement = str(final_content_pages).encode('latin-1')
+    
+    if isinstance(output_bytes, str):
+        # Fallback falls es doch ein String ist
+        output_bytes = output_bytes.replace("{nb_true}", str(final_content_pages)).encode('latin-1')
+    else:
+        output_bytes = output_bytes.replace(placeholder, replacement)
+    
+    return output_bytes

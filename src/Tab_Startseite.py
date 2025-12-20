@@ -1,68 +1,80 @@
 import streamlit as st
-import yfinance as yf
 from .style import (
     GUTMANN_LOGO_URL,
     GUTMANN_ACCENT_GREEN,
+    GUTMANN_DARK_GREEN,
     GUTMANN_LIGHT_TEXT,
     GUTMANN_SECONDARY_DARK
 )
 
 def render():
     """
-    Rendert den Inhalt des 'Startseite' Tabs (Advisor Dashboard).
+    Rendert den Inhalt des 'Startseite' Tabs als modernes Advisor Dashboard V3.
     """
-    st.markdown(f"""<div style="display: flex; align-items: center; justify-content: center; margin-top: 20px; margin-bottom: 30px;"><img src="{GUTMANN_LOGO_URL}" alt="Bank Gutmann Logo" style="width: 350px;"></div>""", unsafe_allow_html=True)
+    # 1. Header Area
+    # Spalten: [Titel/Status - Logo - Leer]
+    c_left, c_center, c_right = st.columns([2, 2, 1])
     
-    st.title("Private Banking Simulation Suite")
-    st.markdown("### 🏛️ Leitfaden für das Kundengespräch")
-    st.markdown("Willkommen im Beratungs-Interface. Dieses Tool dient zur Visualisierung von **Vermögensszenarien** auf Basis realer Marktdaten und stochastischer Prognosen.")
-
-    col_info1, col_info2 = st.columns(2)
-    
-    # Custom HTML Boxen für CI-Konformität
-    with col_info1:
-        st.markdown(f"""
-        <div class="gutmann-box">
-            <h4>1. Phase: Status Quo & Historie</h4>
-            <ul>
-                <li><strong>Erfassung:</strong> Geplantes Portfolio (Einmalerlag & Sparpläne).</li>
-                <li><strong>Backtesting:</strong> Zeigen Sie dem Kunden die Entwicklung seit z.B. 2020.</li>
-                <li><em>Ziel: Vertrauen durch Transparenz schaffen.</em></li>
-            </ul>
-        </div>
-        """, unsafe_allow_html=True)
+    with c_left:
+        # Title Left
+        st.markdown(f"<h1 style='color:{GUTMANN_DARK_GREEN}; margin-top:0px;'>Advisor Dashboard</h1>", unsafe_allow_html=True)
+        st.caption("Private Banking Simulation Suite v2.4 | System Status: Online 🟢")
         
-    with col_info2:
+    with c_center:
+        # Logo Center (using flex for perfect centering in column)
         st.markdown(f"""
-        <div class="gutmann-box">
-            <h4>2. Phase: Zukunft & Erwartungsmanagement</h4>
-            <ul>
-                <li><strong>Monte-Carlo-Simulation:</strong> Projektion über 5 bis 30 Jahre.</li>
-                <li><strong>Szenarien:</strong> Best Case, Worst Case und Median.</li>
-                <li><em>Ziel: Realistische Einschätzung von Chancen und Risiken.</em></li>
-            </ul>
+        <div style="display: flex; justify-content: center;">
+            <img src="{GUTMANN_LOGO_URL}" alt="Bank Gutmann Logo" style="width: 200px;">
         </div>
         """, unsafe_allow_html=True)
 
-    st.markdown("#### ⚠️ Compliance-Hinweis für den Berater")
-    st.caption("""
-    Bitte weisen Sie den Kunden darauf hin, dass vergangene Wertentwicklungen kein verlässlicher Indikator für die Zukunft sind. 
-    Die Prognosen basieren auf mathematischen Modellen (Monte Carlo) und stellen keine Garantie dar. 
-    Alle Werte verstehen sich vor Steuern, sofern nicht anders konfiguriert.
-    """)
+    st.markdown("---")
+
+    # 2. Quick Actions (Simplified V3)
+    st.subheader("🚀 Quick Actions")
     
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    # --- FIX FÜR DEN FEHLER ---
-    # Wir definieren eine Callback-Funktion. Diese wird ausgeführt, BEVOR Streamlit neu lädt.
     def go_to_simulation():
-        st.session_state.main_nav = "Simulation"
+         st.session_state.main_nav = "Simulation"
+    
+    # Große Action Card
+    st.markdown(f"""
+    <div style="background-color: {GUTMANN_SECONDARY_DARK}; padding: 20px; border-radius: 8px; border-left: 6px solid {GUTMANN_ACCENT_GREEN}; margin-bottom: 20px;">
+        <h3 style="color: {GUTMANN_ACCENT_GREEN}; margin-top:0;">Neues Kundengespräch</h3>
+        <p style="color: {GUTMANN_LIGHT_TEXT}; font-size: 1.0rem;">Starten Sie eine neue Simulation. Konfigurieren Sie Portfolio, Sparpläne und Szenarien.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Button nur im ersten Drittel der Breite unter der Card (wirkt "aufgeräumter")
+    c_btn1, c_btn2, c_btn3 = st.columns([1, 1, 1])
+    with c_btn1:
+        st.button("Simulation starten 👉", key="btn_start_sim", use_container_width=True, type="primary", on_click=go_to_simulation)
 
-    # Wir nutzen 'on_click' um den State sicher zu ändern
-    # ÄNDERUNG: Emoji entfernt, nur Text "Simulation starten"
-    st.button("Simulation starten", use_container_width=True, type="primary", on_click=go_to_simulation)
+    st.markdown("<br>", unsafe_allow_html=True)
 
-    # --- DATEN-WARTUNG (Cache Pre-loading) ---
+    # 3. Advisor Talking Points (Markt-Kontext)
+    st.subheader("💬 Talking Points: Markt & Strategie")
+    
+    tp_col1, tp_col2 = st.columns(2)
+    
+    with tp_col1:
+         st.info("**Aktuelles Marktumfeld**")
+         st.markdown("""
+         *   **Zinswende:** Die Zentralbanken signalisieren stabile Zinsen. Anleihen bieten wieder attraktive laufende Erträge.
+         *   **Technologie-Sektor:** Volatilität bleibt hoch, aber langfristige Trends (AI, Cloud) sind intakt.
+         *   **Inflation:** Rückläufig, aber strukturell höher als vor 2020. Realzinserhalt bleibt Priorität.
+         """)
+         
+    with tp_col2:
+         st.success("**Strategische Argumente**")
+         st.markdown("""
+         *   **Cost-Average-Effekt:** Sparpläne nutzen Schwächephasen automatisch zum günstigen Nachkauf.
+         *   **Diversifikation:** Nicht alles auf eine Karte setzen. Der Mix aus Tech & Value stabilisiert das Depot.
+         *   **Langfristigkeit:** Historisch betrachtet hat sich der Aktienmarkt über 15+ Jahre immer positiv entwickelt.
+         """)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # 4. System Wartung (Eingeklappt)
     with st.expander("🛠️ System-Wartung (Daten-Cache)"):
         st.write("Laden Sie hier alle Marktdaten für den Katalog lokal herunter, um die App offline-fähig und robuster zu machen.")
         
@@ -74,7 +86,6 @@ def render():
             
             status_text.write("⏳ Starte Pre-loading... Dies kann einige Minuten dauern.")
             
-            # Da wir die Progress-Bar anzeigen wollen, rufen wir eine leicht angepasste Version auf
             from .catalog import KATALOG
             from . import backend_simulation
             from datetime import date
@@ -91,7 +102,7 @@ def render():
                     st.error(f"Fehler bei {ticker}: {e}")
                 
                 progress_bar.progress(i / total)
-                time.sleep(0.1) # Kurze Pause
+                time.sleep(0.05) 
                 
             status_text.write("✅ **Pre-loading abgeschlossen!** Alle Daten sind nun lokal gespeichert.")
             st.balloons()
