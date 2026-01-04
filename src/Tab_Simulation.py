@@ -3,6 +3,7 @@ from datetime import date
 import numpy as np
 import yfinance as yf
 import base64
+import copy
 import streamlit.components.v1 as components
 
 # Relative Imports innerhalb des src-Pakets
@@ -59,7 +60,7 @@ def render():
     header_col1, header_col2, header_col3 = st.columns([0.5, 0.5, 2])  # 30% schmaler!
     
     with header_col1:
-        st.markdown("**👤 BERATER**")
+        st.markdown("**BERATER**")
         st.text_input(
             "Name des Beraters", 
             value=handover.get("advisor", "Mag. Anna Berger")[:30],
@@ -69,7 +70,7 @@ def render():
         )
     
     with header_col2:
-        st.markdown("**🤝 KUNDE**")
+        st.markdown("**KUNDE**")
         st.text_input(
             "Name des Kunden", 
             value=handover.get("client", "Max Mustermann")[:30],
@@ -80,35 +81,74 @@ def render():
     
     with header_col3:
         # Header für Portfolio Bereich
-        st.markdown("**💼 PORTFOLIO-ÜBERSICHT**")
+        st.markdown("**PORTFOLIO-ÜBERSICHT**")
         
-        # Werte aus Handover-Daten (nicht berechnet!)
-        budget = handover.get("budget", 0)
-        einmalerlag_display = handover.get("einmalerlag", 0)
-        sparrate_display = handover.get("savings_rate", 0)
+        # --- REACTIVE CALCULATION: Werte werden nun editierbar und triggern Neuberechnung ---
+        # Initialisiere editierbare Werte in Session State (falls nicht vorhanden)
+        if "editable_budget" not in st.session_state:
+            st.session_state.editable_budget = handover.get("budget", 25000.0)
+        if "editable_einmalerlag" not in st.session_state:
+            st.session_state.editable_einmalerlag = handover.get("einmalerlag", 0.0)
+        if "editable_sparrate" not in st.session_state:
+            st.session_state.editable_sparrate = handover.get("savings_rate", 0.0)
+        
         portfolio_type_display = handover.get("portfolio_type", "Manuell")
         
-        # Premium 1x4 Grid (eine Reihe)
+        # Callback für Neuberechnung aller Assets
+        def recalculate_assets_from_totals():
+            """Berechnet Euro-Beträge aller Assets basierend auf Gewichtung * Gesamt-Werte"""
+            for asset in st.session_state.assets:
+                weight = asset.get("Gewichtung (%)", 0.0)
+                asset["Einmalerlag (€)"] = (st.session_state.editable_einmalerlag * weight) / 100
+                asset["Sparbetrag (€)"] = (st.session_state.editable_sparrate * weight) / 100
+            st.session_state.needs_rerun = True
+        
+        # Callback für Budget-Änderung: Einmalerlag auf max. Budget begrenzen
+        def on_budget_change():
+            # Nur begrenzen wenn Einmalerlag über Budget, NICHT recalculate aufrufen
+            if st.session_state.editable_einmalerlag > st.session_state.editable_budget:
+                st.session_state.editable_einmalerlag = st.session_state.editable_budget
+        
+        # Premium 1x4 Grid (eine Reihe) - JETZT EDITIERBAR
         with st.container(border=True):
             r1c1, r1c2, r1c3, r1c4 = st.columns(4)
             
             with r1c1:
-                st.metric("Budget", f"€ {budget:,.0f}")
+                st.number_input(
+                    "Budget (€)",
+                    min_value=0.0,
+                    step=1000.0,
+                    key="editable_budget",
+                    format="%.0f",
+                    on_change=on_budget_change,
+                )
             with r1c2:
-                st.metric("Einmalerlag", f"€ {einmalerlag_display:,.0f}")
+                # Einmalerlag OHNE max_value (verhindert Reset bei Budget-Änderung)
+                # Validierung erfolgt über on_budget_change Callback
+                st.number_input(
+                    "Einmalerlag (€)",
+                    min_value=0.0,
+                    step=1000.0,
+                    key="editable_einmalerlag",
+                    format="%.0f",
+                    on_change=recalculate_assets_from_totals,
+                )
             with r1c3:
-                st.metric("Sparrate", f"€ {sparrate_display:,.0f}")
+                st.number_input(
+                    "Sparrate (€)",
+                    min_value=0.0,
+                    step=100.0,
+                    key="editable_sparrate",
+                    format="%.0f",
+                    on_change=recalculate_assets_from_totals,
+                )
             with r1c4:
-                trunc_type = str(portfolio_type_display) if portfolio_type_display else "Manuell"
-                if len(trunc_type) > 15:
-                    if "(" in trunc_type:
-                        trunc_type = trunc_type.split("(")[0].strip()
-                    else:
-                        trunc_type = trunc_type[:12] + "..."
-                st.metric("Portfolio Type", trunc_type) # Umbenannt von Art -> Portfolio Type
+                # Portfolio-Type Anzeige (ohne Trunkierung für Konsistenz)
+                display_type = str(portfolio_type_display) if portfolio_type_display else "Manuell"
+                st.metric("Portfolio Type", display_type)
 
     # Budget Limit für spätere Verwendung (Sidebar Warnung)
-    budget_limit = handover.get("budget", 0)
+    budget_limit = st.session_state.editable_budget
     
     # --- AUTO-LOADING LOGIC (nur beim ersten Render) ---
     if (handover.get("portfolio_type") and not handover.get("preloaded")):
@@ -156,9 +196,9 @@ def render():
     
     # st.subheader("Empfohlene Produkte")  <-- GELÖSCHT V4
     
-    # Hilfsfunktion: Gewichte neu berechnen wenn sich etwas ändert
-    gesamt_einmalerlag = handover.get("einmalerlag", 0)
-    gesamt_sparrate = handover.get("savings_rate", 0)
+    # FIX: Keine Zwischenvariablen mehr - direkt aus Session State lesen
+    # Die number_input Widgets speichern ihre Werte unter dem key im Session State
+    # Wir lesen diese Werte direkt bei der Berechnung, nicht hier
     
     # CSS to hide +/- buttons on number inputs AND center content vertically
     st.markdown("""
@@ -176,6 +216,25 @@ def render():
     /* Align horizontal blocks (rows) ONLY within product table - addressing Header Alignment issue */
     .product-table div[data-testid="stHorizontalBlock"] {
         align-items: center !important;
+    }
+    
+    /* Force vertical centering in bordered containers (asset rows) */
+    div[data-testid="stVerticalBlockBorder"] > div[data-testid="stVerticalBlock"] > div[data-testid="stHorizontalBlock"] {
+        align-items: center !important;
+    }
+    
+    /* Ensure columns inside rows stretch to fill height and center content */
+    div[data-testid="stVerticalBlockBorder"] div[data-testid="column"] {
+        display: flex !important;
+        align-items: center !important;
+    }
+    
+    /* Make text cells match input field height */
+    div[data-testid="stVerticalBlockBorder"] div[data-testid="column"] > div[data-testid="stVerticalBlock"] {
+        justify-content: center !important;
+        min-height: 38px !important;
+        display: flex !important;
+        flex-direction: column !important;
     }
 
     /* SPECIFICALLY center the table header row */
@@ -234,6 +293,21 @@ def render():
         transform: scale(1.2);
         background: none !important;
     }
+    
+    /* Prevent toggle buttons from resizing on hover/click */
+    button[data-testid="stBaseButton-secondary"] {
+        transform: none !important;
+        transition: background-color 0.2s ease !important;
+    }
+    button[data-testid="stBaseButton-secondary"]:hover {
+        transform: none !important;
+    }
+    button[data-testid="stBaseButton-secondary"]:active {
+        transform: none !important;
+    }
+    button[data-testid="stBaseButton-secondary"]:focus {
+        transform: none !important;
+    }
 
     /* Special compacting for text inputs in the table */
     div[data-testid="stTextInput"] input {
@@ -280,10 +354,10 @@ def render():
                 c1, c2, c3, c4, c5, c6, c7 = st.columns([1.5, 1.5, 1, 1.2, 1.2, 1.2, 0.5])
                 
                 with c1:
-                    st.markdown(f"{name}")
+                    st.markdown(f'<p>{name}</p>', unsafe_allow_html=True)
                 
                 with c2:
-                    st.caption(ticker)
+                    st.markdown(f'<p style="color: #999; font-size: 0.85em;">{ticker}</p>', unsafe_allow_html=True)
                 
                 with c3:
                     # Gewichtung als Text-Input (ohne +/-)
@@ -308,32 +382,27 @@ def render():
                     )
                 
                 with c4:
-                    # Einmalbetrag editierbar
+                    # Einmalbetrag READ-ONLY: Berechnet aus Gewichtung * Gesamt-Einmalerlag
                     current_weight = st.session_state.assets[idx].get("Gewichtung (%)", 0.0)
-                    einmalerlag_val = (gesamt_einmalerlag * current_weight) / 100
-                    e_key = f"einmal_text_{idx}"
+                    einmalerlag_val = (st.session_state.editable_einmalerlag * current_weight) / 100
                     
-                    st.text_input(
-                        "€ Einmal",
-                        value=f"{einmalerlag_val:,.0f}".replace(",", "."),
-                        key=e_key,
-                        label_visibility="collapsed",
-                        # on_change=on_einmal_change  <-- DEACTIVATED V4
-                    )
+                    # Speichere berechneten Wert im Session State für Simulation
+                    st.session_state.assets[idx]["Einmalerlag (€)"] = einmalerlag_val
+                    
+                    # Markdown mit vertikaler Zentrierung
+                    st.markdown(f'<p style="font-weight: bold;">€ {einmalerlag_val:,.0f}</p>', unsafe_allow_html=True)
                 
                 with c5:
-                    # Sparbetrag editierbar
+                    # Sparbetrag READ-ONLY: Berechnet aus Gewichtung * Gesamt-Sparrate
                     current_weight = st.session_state.assets[idx].get("Gewichtung (%)", 0.0)
-                    sparrate_val = (gesamt_sparrate * current_weight) / 100
-                    s_key = f"spar_text_{idx}"
+                    sparrate_val = (st.session_state.editable_sparrate * current_weight) / 100
                     
-                    st.text_input(
-                        "€ Spar",
-                        value=f"{sparrate_val:,.0f}".replace(",", "."),
-                        key=s_key,
-                        label_visibility="collapsed",
-                        # on_change=on_spar_change  <-- DEACTIVATED V4
-                    )
+                    # Speichere berechneten Wert im Session State für Simulation
+                    st.session_state.assets[idx]["Sparbetrag (€)"] = sparrate_val
+                    
+                    # Markdown mit vertikaler Zentrierung
+                    st.markdown(f'<p style="font-weight: bold;">€ {sparrate_val:,.0f}</p>', unsafe_allow_html=True)
+
                 
                 with c6:
                     # Spar-Intervall EDITABLE mit Dropdown
@@ -399,11 +468,12 @@ def render():
     months_sim = ((end_date_sim.year - start_date_sim.year) * 12 + (end_date_sim.month - start_date_sim.month))
     
     # Wir berechnen die projizierte Gesamteinzahlung NACH dem Editor
+    # FIX: Lese direkt aus Session State
     proj_total_invest = 0
     for idx, a in enumerate(st.session_state.assets):
         current_w = a.get("Gewichtung (%)", 0)
-        init_val = (gesamt_einmalerlag * current_w) / 100
-        rate_val = (gesamt_sparrate * current_w) / 100
+        init_val = (st.session_state.editable_einmalerlag * current_w) / 100
+        rate_val = (st.session_state.editable_sparrate * current_w) / 100
         inter_val = a.get("Spar-Intervall", "monatlich")
         
         asset_total = init_val
@@ -466,7 +536,6 @@ def render():
             is_valid = False
             
             # Werte aus dem Formular lesen
-            weight_input = st.session_state.widget_add_weight
             interval = st.session_state.widget_add_interval
 
             if st.session_state.katalog_auswahl != "Bitte wählen...":
@@ -480,32 +549,28 @@ def render():
                     if is_valid:
                         name_to_add = message_or_name
                     else:
-                        st.toast(f"Fehler: {message_or_name}", icon="❌")
+                        st.session_state.add_error_message = f"Fehler: {message_or_name}"
             
             if is_valid and isin_to_add:
                 # Asset hinzufügen mit Gewichtung
-                gesamt_einmalerlag = st.session_state.handover_data.get("einmalerlag", 0)
-                gesamt_sparrate = st.session_state.handover_data.get("savings_rate", 0)
+                # FIX Bug #5: Kein Auto-Rebalancing mehr, User-Input wird respektiert
+                # Neuer Workflow: Assets mit 0% hinzufügen, User passt in Tabelle an
+                gesamt_einmalerlag = st.session_state.editable_einmalerlag
+                gesamt_sparrate = st.session_state.editable_sparrate
                 
                 st.session_state.assets.append({
                     "Name": name_to_add,
                     "ISIN / Ticker": isin_to_add,
-                    "Gewichtung (%)": weight_input,
-                    "Einmalerlag (€)": (gesamt_einmalerlag * weight_input) / 100,
-                    "Sparbetrag (€)": (gesamt_sparrate * weight_input) / 100,
+                    "Gewichtung (%)": 0.0,  # GEÄNDERT: Immer 0% beim Hinzufügen
+                    "Einmalerlag (€)": 0.0,
+                    "Sparbetrag (€)": 0.0,
                     "Spar-Intervall": interval,
                 })
                 
-                # GLEICHVERTEILUNG: Alle Gewichte neu verteilen
-                num_assets = len(st.session_state.assets)
-                if num_assets > 0:
-                    equal_weight = 100.0 / num_assets
-                    for asset in st.session_state.assets:
-                        asset["Gewichtung (%)"] = equal_weight
-                        asset["Einmalerlag (€)"] = (gesamt_einmalerlag * equal_weight) / 100
-                        asset["Sparbetrag (€)"] = (gesamt_sparrate * equal_weight) / 100
+                # ENTFERNT: Keine automatische Gleichverteilung mehr (Bug #5 Fix)
+                # User setzt Gewichtung selbst in der Tabelle
                 
-                st.toast(f"'{name_to_add}' erfolgreich hinzugefügt!", icon="✅")
+                st.toast(f"'{name_to_add}' erfolgreich hinzugefügt! Bitte Gewichtung in der Tabelle setzen.", icon="✅")
                 # Reset der Inputs
                 st.session_state.katalog_auswahl = "Bitte wählen..."
                 st.session_state.manuelle_isin = ""
@@ -521,24 +586,20 @@ def render():
                 with col_sel2:
                     st.text_input("Oder ISIN / Ticker manuell eingeben", key="manuelle_isin", placeholder="z.B. US0378331005")
                 
-                # Zeile 2: Beträge + Button in einer Reihe -> Sehr kompakt
-                col_val1, col_val2, col_val3, col_btn = st.columns([1, 1, 1, 1])
+                # Zeile 2: Intervall + Button in einer Reihe -> Sehr kompakt (Gewichtung entfernt)
+                col_val1, col_val2, col_btn = st.columns([1, 1, 1])
                 with col_val1:
-                    # DEFAULT-Gewichtung berechnen
-                    if len(st.session_state.assets) > 0:
-                        default_weight = 100.0 / (len(st.session_state.assets) + 1)
-                    else:
-                        default_weight = 100.0
-                    st.number_input("Gewichtung (%)", min_value=0.0, max_value=100.0, value=float(default_weight), step=1.0, key="widget_add_weight")
-                with col_val2:
                     st.selectbox("Intervall", ["monatlich", "vierteljährlich", "jährlich"], key="widget_add_interval")
-                with col_val3:
+                with col_val2:
                     st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
                 with col_btn:
                     st.markdown('<div style="margin-top: 28px;"></div>', unsafe_allow_html=True)
                     st.form_submit_button("Titel Hinzufügen", use_container_width=True, type="primary", on_click=handle_add_click)
-
-
+        
+        # Fehlermeldung anzeigen (nach Formular, gut sichtbar)
+        if "add_error_message" in st.session_state and st.session_state.add_error_message:
+            st.error(st.session_state.add_error_message)
+            st.session_state.add_error_message = None  # Reset nach Anzeige
 
 
     # --- 2. KOSTEN SETTINGS CONTAINER (only shows when toggled) ---
@@ -559,14 +620,17 @@ def render():
     simulation_successful = False
     
     # Check if calculation is needed (Assets changed, dates changed, or results missing)
-    # WICHTIG: list(...) Erzeugt eine Kopie, damit Änderungen erkannt werden!
+    # WICHTIG: Deep Copy der Assets, damit auch Änderungen in Dict-Werten erkannt werden!
+    # FIX: Auch editable_einmalerlag und editable_sparrate tracken für Neuberechnung
     calc_relevant_state = {
-        "assets": list(st.session_state.assets), 
+        "assets": copy.deepcopy(st.session_state.assets),  # Deep Copy für Dict-Änderungen
         "start_date": st.session_state.sim_start_date,
         "end_date": st.session_state.sim_end_date,
         "ausgabe": st.session_state.cost_ausgabe,
         "mgmt": st.session_state.cost_management,
-        "depot": st.session_state.cost_depot
+        "depot": st.session_state.cost_depot,
+        "einmalerlag": st.session_state.editable_einmalerlag,  # NEU: Trigger bei Änderung
+        "sparrate": st.session_state.editable_sparrate  # NEU: Trigger bei Änderung
     }
     
     if "last_calc_state" not in st.session_state:
@@ -754,6 +818,12 @@ def render():
                      prog_kpis_dict["Endkapital (Pessimistisch)"] = f"EUR {val_pess:,.2f}"
 
                 try:
+                    # FIX: Erstelle aktualisierte handover_data mit editierbaren Werten
+                    updated_handover_data = dict(st.session_state.handover_data)
+                    updated_handover_data['budget'] = st.session_state.editable_budget
+                    updated_handover_data['einmalerlag'] = st.session_state.editable_einmalerlag
+                    updated_handover_data['savings_rate'] = st.session_state.editable_sparrate
+                    
                     pdf_bytes = generate_pdf_report(
                         assets=st.session_state.assets,
                         global_params=global_params,
@@ -761,7 +831,7 @@ def render():
                         hist_kpis=hist_kpis_dict,
                         prog_fig=fig_prog,
                         prog_kpis=prog_kpis_dict,
-                        handover_data=st.session_state.handover_data,
+                        handover_data=updated_handover_data,
                         hist_returns=st.session_state.historical_returns_pa,
                         prog_returns=st.session_state.prognosis_assumptions_pa,
                         date_range_hist=range_hist_str,
@@ -925,25 +995,24 @@ def render():
                     expected_volatility_pa=FIXED_VOLATILITY,
                     n_simulations=FIXED_N_SIMULATIONS
                 )
-            
+
             # SLIDER ENTFERNT - Nur noch Jahre und Rendite Inputs
             var_col_yr, var_col_ret = st.columns([1, 2])
-            
+
             with var_col_yr:
                 st.markdown("**Prognose-Horizont**")
-                st.slider(
-                    "Jahre", 
-                    min_value=5, max_value=30, 
-                    value=st.session_state.prognose_jahre, 
+                st.number_input(
+                    "Prognose-Horizont (Jahre)",  # FIX Bug #10: Explizit "Jahre" hinzugefügt
+                    min_value=1, max_value=50, value=st.session_state.prognose_jahre, step=1,
                     key="widget_prognose_jahre",
                     on_change=update_prognose_jahre,
-                    label_visibility="collapsed"
+                    help="Zeitraum in Jahren für die Zukunftsprognose"
                 )
 
             with var_col_ret:
                 st.markdown("**Erwartete Rendite (p.a.) je Titel**")
                 current_asset_names = list(st.session_state.prognosis_assumptions_pa.keys())
-                
+
                 if current_asset_names:
                     cols_per_row = 3
                     grid_cols = st.columns(cols_per_row)

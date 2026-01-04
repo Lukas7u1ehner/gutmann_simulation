@@ -81,6 +81,14 @@ MARKET_PHASES = [
         "end": "1987-12-04",
         "desc": "Größter Tagesverlust der Geschichte (-22,6% am 19. Okt). Program Trading verschärfte den Crash. Gesamtrückgang ca. 34%.",
         "color": "rgba(255, 0, 0, 0.1)"
+    },
+    # --- AKTUELLE EREIGNISSE (2025+) ---
+    {
+        "label": "Trump Zölle",
+        "start": "2025-04-01",
+        "end": "2025-04-30",
+        "desc": "Ankündigung neuer US-Importzölle führte zu globaler Handelsunsicherheit und Volatilität an den Märkten.",
+        "color": "rgba(255, 165, 0, 0.15)"  # Orange, etwas stärker
     }
 ]
 

@@ -6,10 +6,10 @@ PORTFOLIO_TEMPLATES = {
         "display_name": "Nachhaltigkeit (ESG)",
         "description": "Fokus auf nachhaltige Investments und ESG-Kriterien",
         "assets": [
-            {"ticker": "LLY", "name": "Eli Lilly", "weight": 35},
-            {"ticker": "GOOGL", "name": "Alphabet / Google", "weight": 30},
-            {"ticker": "KO", "name": "Coca-Cola", "weight": 20},
-            {"ticker": "AAPL", "name": "Apple", "weight": 15}
+            {"ticker": "VER.VI", "name": "Verbund AG (Wasserkraft)", "weight": 30},
+            {"ticker": "ORSTED.CO", "name": "Ørsted (Windenergie)", "weight": 30},
+            {"ticker": "VWS.CO", "name": "Vestas Wind Systems", "weight": 25},
+            {"ticker": "SU.PA", "name": "Schneider Electric (Green Tech)", "weight": 15}
         ]
     },
     "Quantitativ (Rule-based)": {

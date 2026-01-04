@@ -206,20 +206,10 @@ def apply_gutmann_style():
         font-weight: bold !important;
         fill: {GUTMANN_DARK_GREEN} !important;
     }}
-    
-    .stButton > button:hover {{
-        background-color: {GUTMANN_ACCENT_GREEN} !important;
-        filter: brightness(110%);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-    }}
-    .stButton > button:hover p {{
-        color: {GUTMANN_DARK_GREEN} !important;
-    }}
 
     .stButton > button:focus {{
         outline: none;
-        box-shadow: 0 0 0 2px {GUTMANN_ACCENT_GREEN};
-        color: {GUTMANN_DARK_GREEN} !important;
+        box-shadow: none;
     }}
 
     /* --- 6. SEKUNDÄRE BUTTONS (Kosten Einstellungen) --- */
@@ -230,14 +220,6 @@ def apply_gutmann_style():
     }}
     .stButton > button[kind="secondary"] p {{
         color: {GUTMANN_LIGHT_TEXT} !important;
-    }}
-    .stButton > button[kind="secondary"]:hover {{
-        background-color: {GUTMANN_DARK_GREEN} !important;
-        border-color: {GUTMANN_ACCENT_GREEN} !important;
-        color: {GUTMANN_ACCENT_GREEN} !important;
-    }}
-    .stButton > button[kind="secondary"]:hover p {{
-        color: {GUTMANN_ACCENT_GREEN} !important;
     }}
 
     /* --- 7. INPUT FELDER & DROPDOWNS --- */
