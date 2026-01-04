@@ -209,8 +209,8 @@ def run_simulation(
         periodic_data.iloc[i, periodic_data.columns.get_loc("Shares_Bought")] = shares_bought
 
         if i == 0:
-            periodic_data.iloc[i, periodic_data.columns.get_loc("TotalInvestment_Periodic")] = 0.0
-            periodic_data.iloc[i, periodic_data.columns.get_loc("TotalShares_Periodic")] = 0.0
+            periodic_data.iloc[i, periodic_data.columns.get_loc("TotalInvestment_Periodic")] = gross_inv
+            periodic_data.iloc[i, periodic_data.columns.get_loc("TotalShares_Periodic")] = shares_bought
         else:
             periodic_data.iloc[i, periodic_data.columns.get_loc("TotalInvestment_Periodic")] = periodic_data.iloc[i-1]["TotalInvestment_Periodic"] + gross_inv
             periodic_data.iloc[i, periodic_data.columns.get_loc("TotalShares_Periodic")] = periodic_data.iloc[i-1]["TotalShares_Periodic"] + shares_bought
@@ -270,10 +270,14 @@ def run_simulation(
         daily_data_with_portfolio["Portfolio (nominal)"] / inflation_series
     )
 
-    # 8. Rückgabe
+    # 8. Rückgabe & Cleanup
     final_daily_df = daily_data_with_portfolio[
         ["TotalInvestment", "Portfolio (nominal)", "Portfolio (real)"]
     ].copy()
+    
+    # FIX: Entferne Zeilen mit 0-Werten am Anfang/Ende, um Grafik-Drops zu vermeiden
+    final_daily_df = final_daily_df[final_daily_df["Portfolio (nominal)"] > 1.0]
+
     final_daily_df = final_daily_df.rename(
         columns={"TotalInvestment": "Einzahlungen (brutto)"}
     )
