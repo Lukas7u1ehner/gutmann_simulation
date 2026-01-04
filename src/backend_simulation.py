@@ -228,18 +228,37 @@ def run_simulation(
 
     daily_data_with_portfolio["TotalShares_Periodic"] = daily_data_with_portfolio["TotalShares_Periodic"].fillna(0)
     daily_data_with_portfolio["TotalInvestment_Periodic"] = daily_data_with_portfolio["TotalInvestment_Periodic"].fillna(0)
-
+    
+    # FIX: Falls die erste Zeile durch merge_asof 0 ist (weil Start-Datum vor erstem Periodic-Datum),
+    # aber wir eigentlich bei Periodic i=0 starten wollen:
+    # Wir füllen "forward" von 0 aus, aber wichtiger ist, dass wir sicherstellen, dass wir nicht 0 haben,
+    # wenn wir eigentlich schon investiert haben.
+    # Besser: Wir sorgen dafür, dass ab dem ersten Datenpunkt korrekte Werte stehen.
+    
+    # Workaround: Fülle die 0-Werte am Anfang mit dem Wert der ersten Periode, 
+    # FALLS das Daten-Startdatum sehr nahe am Perioden-Start liegt.
+    # Hier vereinfacht: Wir nutzen ffill() für Shares/Investment, falls irgendwo NaN auftaucht (sollte nicht, aber sicher ist sicher).
+    daily_data_with_portfolio["TotalShares_Periodic"] = daily_data_with_portfolio["TotalShares_Periodic"].replace(to_replace=0, method='ffill') 
+    
     # --- 6. ADDITION DES EINMALERLAGS (LUMP SUM) ---
     lump_sum_shares = 0.0
     if lump_sum > 0 and not data.empty:
-        first_day_price = data.iloc[0]["Close"]
-        net_lump_sum = lump_sum * cost_factor
+        # Wir nehmen den Close vom ERSTEN VERFÜGBAREN TAG im DataFrame
+        first_valid_idx = data["Close"].first_valid_index()
+        if first_valid_idx:
+            first_day_price = data.loc[first_valid_idx, "Close"]
+            net_lump_sum = lump_sum * cost_factor
+            if first_day_price > 0:
+                lump_sum_shares = net_lump_sum / first_day_price
 
-        if first_day_price > 0:
-            lump_sum_shares = net_lump_sum / first_day_price
-
+    # Berechnung der Gesamt-Anteile
     daily_data_with_portfolio["TotalShares"] = daily_data_with_portfolio["TotalShares_Periodic"] + lump_sum_shares
     daily_data_with_portfolio["TotalInvestment"] = daily_data_with_portfolio["TotalInvestment_Periodic"] + lump_sum
+    
+    # FIX: Forward Fill für die Anteile und Investments bis zum Ende, 
+    # falls Perioden-Logik aufhört aber Daten weiterlaufen.
+    daily_data_with_portfolio["TotalShares"] = daily_data_with_portfolio["TotalShares"].ffill()
+    daily_data_with_portfolio["TotalInvestment"] = daily_data_with_portfolio["TotalInvestment"].ffill()
     
     # --- 7. BERECHNE FINALEN WERT & GEBÜHREN ---
 
