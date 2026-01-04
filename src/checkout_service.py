@@ -61,6 +61,9 @@ def reset_simulation_state():
     # st.session_state.main_nav = "Startseite"  <-- verursacht API Exception
     # Sub-Nav resetten (optional, aber sauber)
     st.session_state.sim_sub_nav_state = "Historische Simulation"
+    
+    # 5. URL-Parameter bereinigen (direkt beim Interaktions-Event)
+    st.query_params.clear()
 
 def render_finish_button(key_suffix):
     """

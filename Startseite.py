@@ -23,7 +23,7 @@ if st.session_state.get("pending_reset"):
             
     # Optional: Handover-Daten resetten, damit Simulation neu lädt
     if "handover_data" in st.session_state:
-        st.session_state.handover_data["preloaded"] = False
+        del st.session_state["handover_data"]
         
     # FIX: Auch die URL-Parameter löschen, damit bei Rerun nicht wieder die alten Daten geladen werden
     st.query_params.clear()
