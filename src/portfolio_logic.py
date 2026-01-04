@@ -95,7 +95,26 @@ def run_portfolio_simulation(
     if not individual_simulations:
         return None, {}, {}
 
-    portfolio_df = pd.concat(individual_simulations)
+    # FIX: Synchronisiere alle Simulationen auf den vollen Zeitraum
+    # Verhindert, dass Assets am Ende "aussteigen" und die Summe droppt.
+    aligned_simulations = []
+    full_index = pd.date_range(start=start_date, end=end_date, freq="D")
+    
+    for df in individual_simulations:
+        # 1. Reindex auf vollen Zeitraum
+        # 2. ffill() -> Werte fortschreiben (wichtig für Delistings oder Datenlücken am Ende)
+        # 3. bfill(limit=10) -> Kleine Lücken am Anfang (Feiertage, Wochenende) schließen
+        # 4. fillna(0) -> Vor dem Startdatum (wenn länger als Limit) ist alles 0
+        df_aligned = df.reindex(full_index).ffill().bfill(limit=10).fillna(0.0)
+        aligned_simulations.append(df_aligned)
+
+    if not aligned_simulations:
+         return None, {}, {}
+
+    # Summiere die angeglichenen DataFrames
+    # Da alle denselben Index haben, können wir einfach sum() auf die Liste anwenden (oder concat + groupby)
+    # pd.concat + groupby(level=0).sum() ist robust
+    portfolio_df = pd.concat(aligned_simulations)
     final_portfolio = portfolio_df.groupby(portfolio_df.index).sum()
 
     # Depotgebühren Logik (Nachträglich auf Gesamtportfolio)
