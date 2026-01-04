@@ -13,15 +13,30 @@ except ImportError:
 
 st.set_page_config(page_title="Simulation | Gutmann", page_icon="📈", layout="wide")
 
+# --- CHECKOUT RESET LOGIC (Fix für StreamlitAPIException) ---
+if st.session_state.get("pending_reset"):
+    # Widget-Keys sicher löschen (sodass sie beim nächsten Render neu initialisiert werden)
+    keys_to_reset = ["editable_budget", "editable_einmalerlag", "editable_sparrate", "main_nav"]
+    for key in keys_to_reset:
+        if key in st.session_state:
+            del st.session_state[key]
+            
+    # Optional: Handover-Daten resetten, damit Simulation neu lädt
+    if "handover_data" in st.session_state:
+        st.session_state.handover_data["preloaded"] = False
+        
+    st.session_state["pending_reset"] = False
+    st.rerun() # Rerun um sicherzustellen, dass der State sauber ist
+
 # --- URL-PARAMETER-HANDLING (Tool A -> Tool B Simulation) ---
 # Für FH-Projekt: Simuliert die Übergabe von Beraterdaten aus Tool A
 try:
     query_params = st.query_params
     
     # Parameter extrahieren (mit Fallback auf Dummy-Daten)
-    advisor_name = query_params.get("advisorName", "Mag. Anna Berger")
-    client_name = query_params.get("clientName", "Max Mustermann")  
-    budget_str = query_params.get("budget", "25000")
+    advisor_name = query_params.get("advisorName", "MSc Daniela Delipetar")
+    client_name = query_params.get("clientName", "Tamara Wolna")  
+    budget_str = query_params.get("budget", "0")
     einmalerlag_str = query_params.get("einmalerlag", "0")  # NEU: Gesamt-Einmalerlag für Portfolio
     portfolio_type = query_params.get("portfolioType", None)  # None = kein Auto-Loading
     # Support both snake_case and camelCase for savings_rate
@@ -47,7 +62,7 @@ try:
         einmalerlag = float(einmalerlag_str)
         savings_rate = float(savings_rate_str)
     except ValueError:
-        budget = 25000.0
+        budget = 0.0
         einmalerlag = 0.0
         savings_rate = 0.0
     
@@ -68,9 +83,9 @@ except Exception as e:
     # Fallback bei Fehler: Dummy-Daten setzen
     if "handover_data" not in st.session_state:
         st.session_state.handover_data = {
-            "advisor": "Mag. Anna Berger",
-            "client": "Max Mustermann",
-            "budget": 25000.0,
+            "advisor": "MsC Daniel Delipetar",
+            "client": "Tamara Wolna",
+            "budget": 0.0,
             "einmalerlag": 0.0,
             "portfolio_type": None,
             "savings_rate": 0.0,

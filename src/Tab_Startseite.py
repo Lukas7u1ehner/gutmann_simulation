@@ -13,25 +13,12 @@ def render():
     """
     # 1. Header Area
     # Spalten: [Titel/Status - Logo - Leer]
-    c_left, c_center, c_right = st.columns([2, 2, 1])
-    
-    with c_left:
-        # Title Left
-        st.markdown(f"<h1 style='color:{GUTMANN_DARK_GREEN}; margin-top:0px;'>Advisor Dashboard</h1>", unsafe_allow_html=True)
-        st.caption("Private Banking Simulation Suite v2.4 | System Status: Online 🟢")
-        
-    with c_center:
-        # Logo Center (using flex for perfect centering in column)
-        st.markdown(f"""
-        <div style="display: flex; justify-content: center;">
-            <img src="{GUTMANN_LOGO_URL}" alt="Bank Gutmann Logo" style="width: 200px;">
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    # 2. Quick Actions (Simplified V3)
-    st.subheader("🚀 Quick Actions")
+    # 1. Header Area (Logo Only, Centered)
+    st.markdown(f"""
+    <div style="display: flex; justify-content: center; align-items: center; margin-top: 20px; margin-bottom: 30px;">
+        <img src="{GUTMANN_LOGO_URL}" alt="Bank Gutmann Logo" style="width: 400px; max-width: 90%; height: auto;">
+    </div>
+    """, unsafe_allow_html=True)
     
     def go_to_simulation():
          st.session_state.main_nav = "Simulation"
@@ -47,12 +34,12 @@ def render():
     # Button nur im ersten Drittel der Breite unter der Card (wirkt "aufgeräumter")
     c_btn1, c_btn2, c_btn3 = st.columns([1, 1, 1])
     with c_btn1:
-        st.button("Simulation starten 👉", key="btn_start_sim", use_container_width=True, type="primary", on_click=go_to_simulation)
+        st.button("Simulation starten", key="btn_start_sim", use_container_width=True, type="primary", on_click=go_to_simulation)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
     # 3. Advisor Talking Points (Markt-Kontext)
-    st.subheader("💬 Talking Points: Markt & Strategie")
+    st.subheader("Talking Points: Markt & Strategie")
     
     tp_col1, tp_col2 = st.columns(2)
     

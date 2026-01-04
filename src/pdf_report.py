@@ -23,7 +23,7 @@ COLOR_DARK_GREEN = (37, 52, 47)      # Gutmann Dark
 COLOR_ACCENT_GREEN = (179, 212, 99)  # Gutmann Accent
 COLOR_TEXT_GREY = (80, 80, 80)
 COLOR_LIGHT_GREY = (245, 245, 245)
-LOGO_PATH = "assets/gutmann_logo.png"
+LOGO_PATH = "assets/gutmann_logo-removebg-preview.png"
 
 # --- TEXTE ---
 DISCLAIMER_TEXT = """Für diese Aufstellung werden – soweit entsprechende Daten verfügbar sind – die Börsen- bzw. Marktpreise zum jeweiligen Stichtag als Grundlage herangezogen. Diese Stichtagskurse dienen einer einheitlichen Bewertung zum ausgewiesenen Zeitpunkt.
@@ -431,3 +431,131 @@ def generate_pdf_report(assets, global_params, hist_fig, hist_kpis, prog_fig, pr
         output_bytes = output_bytes.replace(placeholder, replacement)
     
     return output_bytes
+
+
+# --- NEUE HELPER FUNKTIONEN (Refactoring für Tab_Simulation) ---
+
+def build_history_kpis(simulations_daten: pd.DataFrame) -> dict:
+    """Erstellt KPI-Dictionary für historische Simulation."""
+    if simulations_daten is None:
+        return {}
+    
+    last_row = simulations_daten.iloc[-1]
+    total_invest = last_row['Einzahlungen (brutto)']
+    end_val = last_row['Portfolio (nominal)']
+    profit = end_val - total_invest
+    rendite_abs = (profit / total_invest * 100) if total_invest > 0 else 0
+    
+    return {
+        "Gesamteinzahlung": f"EUR {total_invest:,.2f}",
+        "Endkapital (nominal)": f"EUR {end_val:,.2f}",
+        "Gewinn/Verlust": f"EUR {profit:,.2f}",
+        "Rendite (absolut)": f"{rendite_abs:.2f} %",
+        "Endkapital (real)": f"EUR {last_row['Portfolio (real)']:,.2f}"
+    }
+
+def build_prognose_kpis(prognose_daten: pd.DataFrame) -> dict:
+    """Erstellt KPI-Dictionary für Zukunftsprognose."""
+    if prognose_daten is None:
+        return {}
+    
+    last_row_p = prognose_daten.iloc[-1]
+    start_cap = prognose_daten.iloc[0]['Einzahlungen (brutto)']
+    end_median = last_row_p['Portfolio (Median)']
+    rendite_prog = ((end_median / last_row_p['Einzahlungen (brutto)']) - 1) * 100
+    
+    return {
+        "Startkapital (Ist-Stand)": f"EUR {start_cap:,.2f}",
+        "Geplante Sparraten (Summe)": f"EUR {(last_row_p['Einzahlungen (brutto)'] - start_cap):,.2f}",
+        "Endkapital (Median, nominal)": f"EUR {end_median:,.2f}",
+        "Rendite Erwartungswert": f"{rendite_prog:.2f} %",
+        "Endkapital (Real, Median)": f"EUR {last_row_p['Portfolio (Real_Median)']:,.2f}",
+        "Endkapital (Optimistisch)": f"EUR {last_row_p.get('Portfolio (BestCase)', 0):,.2f}",
+        "Endkapital (Pessimistisch)": f"EUR {last_row_p.get('Portfolio (WorstCase)', 0):,.2f}"
+    }
+
+def build_global_params(prognose_jahre: int, cost_ausgabe: float, 
+                        cost_management: float, cost_depot: float) -> dict:
+    """Erstellt globales Parameter-Dictionary für PDF."""
+    return {
+        "Prognose-Horizont": f"{prognose_jahre} Jahre",
+        "Ausgabeaufschlag": f"{cost_ausgabe} %",
+        "Managementgebühr": f"{cost_management} % p.a.",
+        "Depotgebühr": f"{cost_depot} EUR p.a."
+    }
+
+def create_pdf_with_charts(
+    assets: list,
+    simulations_daten,
+    prognose_daten,
+    handover_data: dict,
+    historical_returns_pa: dict,
+    prognosis_assumptions_pa: dict,
+    sim_start_date,
+    sim_end_date,
+    prognose_jahre: int,
+    cost_ausgabe: float,
+    cost_management: float,
+    cost_depot: float,
+    editable_budget: float,
+    editable_einmalerlag: float,
+    editable_sparrate: float,
+    plotting_module  # Übergeben um Circular Import zu vermeiden
+) -> bytes | None:
+    """
+    Erstellt kompletten PDF-Report mit Charts.
+    Gibt PDF als Bytes zurück oder None bei Fehler.
+    """
+    from datetime import date
+    
+    # Gewichtungs-Validierung
+    total_w = sum(a.get("Gewichtung (%)", 0) for a in assets)
+    if abs(total_w - 100) > 0.1:
+        return None  # Ungültige Gewichtung
+    
+    # Datums-Bereiche formatieren
+    range_hist_str = f"Zeitraum: {sim_start_date.strftime('%d.%m.%Y')} - {sim_end_date.strftime('%d.%m.%Y')}"
+    
+    today = date.today()
+    end_prog = today.replace(year=today.year + prognose_jahre)
+    range_prog_str = f"Zeitraum: {today.strftime('%d.%m.%Y')} - {end_prog.strftime('%d.%m.%Y')}"
+    
+    # Charts erstellen
+    fig_hist = plotting_module.create_simulation_chart(
+        simulations_daten, None, 
+        title="Historische Entwicklung",
+        show_crisis_events=False
+    )
+    
+    fig_prog = None
+    if prognose_daten is not None:
+        fig_prog = plotting_module.create_simulation_chart(
+            None, prognose_daten,
+            title="Zukunftsprognose"
+        )
+    
+    # KPIs bauen
+    hist_kpis = build_history_kpis(simulations_daten)
+    prog_kpis = build_prognose_kpis(prognose_daten)
+    global_params = build_global_params(prognose_jahre, cost_ausgabe, cost_management, cost_depot)
+    
+    # Handover-Data mit editierten Werten
+    updated_handover = dict(handover_data) if handover_data else {}
+    updated_handover['budget'] = editable_budget
+    updated_handover['einmalerlag'] = editable_einmalerlag
+    updated_handover['savings_rate'] = editable_sparrate
+    
+    # PDF generieren
+    return generate_pdf_report(
+        assets=assets,
+        global_params=global_params,
+        hist_fig=fig_hist,
+        hist_kpis=hist_kpis,
+        prog_fig=fig_prog,
+        prog_kpis=prog_kpis,
+        handover_data=updated_handover,
+        hist_returns=historical_returns_pa,
+        prog_returns=prognosis_assumptions_pa,
+        date_range_hist=range_hist_str,
+        date_range_prog=range_prog_str
+    )

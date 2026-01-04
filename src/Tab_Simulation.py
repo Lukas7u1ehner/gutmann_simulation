@@ -86,7 +86,7 @@ def render():
         # --- REACTIVE CALCULATION: Werte werden nun editierbar und triggern Neuberechnung ---
         # Initialisiere editierbare Werte in Session State (falls nicht vorhanden)
         if "editable_budget" not in st.session_state:
-            st.session_state.editable_budget = handover.get("budget", 25000.0)
+            st.session_state.editable_budget = handover.get("budget", 0.0)
         if "editable_einmalerlag" not in st.session_state:
             st.session_state.editable_einmalerlag = handover.get("einmalerlag", 0.0)
         if "editable_sparrate" not in st.session_state:
@@ -492,9 +492,6 @@ def render():
                 "Bitte passen Sie die Positionen an, bis die Summe wieder im Rahmen liegt.",
                 icon="🚨"
             )
-            if "last_warn_val" not in st.session_state or st.session_state.last_warn_val != proj_total_invest:
-                st.toast(f"⚠️ Budget um € {proj_total_invest - budget_limit:,.0f} überschritten!", icon="🚨")
-                st.session_state.last_warn_val = proj_total_invest
     
     st.markdown('<div style="margin-bottom: 30px;"></div>', unsafe_allow_html=True)
 
@@ -519,11 +516,11 @@ def render():
     col_add_btn, col_cost_btn, col_spacer = st.columns([1.5, 1.5, 1])
     
     with col_add_btn:
-        btn_label_add = "💰 Titel verbergen" if st.session_state.show_add_form else "💰 Titel zum Portfolio hinzufügen"
+        btn_label_add = "Titel verbergen" if st.session_state.show_add_form else "Titel zum Portfolio hinzufügen"
         st.button(btn_label_add, use_container_width=True, on_click=toggle_add_form)
     
     with col_cost_btn:
-        btn_label_cost = "💸 Kosten verbergen" if st.session_state.show_cost_settings else "💸 Kosten Einstellungen anzeigen"
+        btn_label_cost = "Kosten verbergen" if st.session_state.show_cost_settings else "Kosten Einstellungen anzeigen"
         st.button(btn_label_cost, use_container_width=True, on_click=toggle_cost_settings)
 
 
@@ -722,138 +719,51 @@ def render():
         # --- PDF REPORT LOGIK ---
         # --- PDF REPORT LOGIK ---
         def show_pdf_download_button(key_suffix):
-            # Prüfen ob überhaupt Daten da sind
+            """Zeigt PDF-Download-Button und handled den Download."""
+            from .pdf_report import create_pdf_with_charts
+            from . import plotting
+            
             if st.session_state.simulations_daten is None:
                 return
-
-            # A) KPIs für Historie sammeln
-            hist_kpis_dict = {}
-            if st.session_state.simulations_daten is not None:
-                last_row = st.session_state.simulations_daten.iloc[-1]
-                total_invest = last_row['Einzahlungen (brutto)']
-                end_val = last_row['Portfolio (nominal)']
-                profit = end_val - total_invest
-                rendite_abs = (profit / total_invest * 100) if total_invest > 0 else 0
-                
-                # Dictionary für die PDF-Tabelle
-                hist_kpis_dict = {
-                    "Gesamteinzahlung": f"EUR {total_invest:,.2f}",
-                    "Endkapital (nominal)": f"EUR {end_val:,.2f}",
-                    "Gewinn/Verlust": f"EUR {profit:,.2f}",
-                    "Rendite (absolut)": f"{rendite_abs:.2f} %",
-                    "Endkapital (real)": f"EUR {last_row['Portfolio (real)']:,.2f}"
-                }
-
-            # B) KPIs für Prognose sammeln (nur wenn vorhanden!)
-            prog_kpis_dict = {}
-            if st.session_state.prognose_daten is not None:
-                last_row_p = st.session_state.prognose_daten.iloc[-1]
-                start_cap = st.session_state.prognose_daten.iloc[0]['Einzahlungen (brutto)']
-                end_median = last_row_p['Portfolio (Median)']
-                # Rendite auf Gesamtinvest
-                rendite_prog = ((end_median / last_row_p['Einzahlungen (brutto)']) - 1) * 100
-                
-                prog_kpis_dict = {
-                    "Startkapital (Ist-Stand)": f"EUR {start_cap:,.2f}",
-                    "Geplante Sparraten (Summe)": f"EUR {(last_row_p['Einzahlungen (brutto)'] - start_cap):,.2f}",
-                    "Endkapital (Median, nominal)": f"EUR {end_median:,.2f}",
-                    "Rendite Erwartungswert": f"{rendite_prog:.2f} %",
-                    "Endkapital (Real, Median)": f"EUR {last_row_p['Portfolio (Real_Median)']:,.2f}"
-                }
             
-            # Globale Params für Seite 1
-            global_params = {
-                "Prognose-Horizont": f"{st.session_state.prognose_jahre} Jahre",
-                "Ausgabeaufschlag": f"{st.session_state.cost_ausgabe} %",
-                "Managementgebühr": f"{st.session_state.cost_management} % p.a.",
-                "Depotgebühr": f"{st.session_state.cost_depot} EUR p.a."
-            }
-
-            # Funktion zum Generieren der PDF
-            def generate_pdf_for_download():
-                # VALIDIERUNG: Nur bei 100% Gewichtung
-                total_w = sum(a.get("Gewichtung (%)", 0) for a in st.session_state.assets)
-                if abs(total_w - 100) > 0.1:
-                    st.toast("⚠️ PDF kann nur bei einer Gesamtgewichtung von 100% erstellt werden!", icon="📊")
-                    return
-
-                # 0. Datums-Bereiche formatieren
-                start_hist = st.session_state.sim_start_date.strftime("%d.%m.%Y")
-                end_hist = st.session_state.sim_end_date.strftime("%d.%m.%Y")
-                range_hist_str = f"Zeitraum: {start_hist} - {end_hist}"
+            if st.button("PDF Report erstellen & herunterladen", 
+                        key=f"btn_gen_pdf_{key_suffix}", 
+                        use_container_width=True, 
+                        type="primary"):
                 
-                # Prognose: Von Heute bis (Heute + Jahre)
-                today = date.today()
-                future_year = today.year + st.session_state.prognose_jahre
-                # Einfache Annahme: Gleicher Tag/Monat in Zukunft
-                end_prog = today.replace(year=future_year)
-                range_prog_str = f"Zeitraum: {today.strftime('%d.%m.%Y')} - {end_prog.strftime('%d.%m.%Y')}"
-                
-                # 1. Historie Chart neu erstellen
-                fig_hist = plotting.create_simulation_chart(
-                    st.session_state.simulations_daten, 
-                    None, 
-                    title="Historische Entwicklung",
-                    show_crisis_events=False
-                )
-                
-                # 2. Prognose Chart neu erstellen (nur wenn Daten da)
-                fig_prog = None
-                if st.session_state.prognose_daten is not None:
-                    fig_prog = plotting.create_simulation_chart(
-                        None,
-                        st.session_state.prognose_daten,
-                        title="Zukunftsprognose"
-                    )
-                
-                # OPTIMISTISCH / PESSIMISTISCH ERGÄNZEN
-                if prog_kpis_dict and st.session_state.prognose_daten is not None:
-                     last_row_p = st.session_state.prognose_daten.iloc[-1]
-                     # Werte formatieren (Keys müssen mit prognose_logic.py übereinstimmen!)
-                     val_opt = last_row_p.get('Portfolio (BestCase)', 0) # War 'Portfolio (Optimistisch)'
-                     val_pess = last_row_p.get('Portfolio (WorstCase)', 0) # War 'Portfolio (Pessimistisch)'
-                     
-                     # Ins Dictionary einfügen (an passender Stelle oder unten dran)
-                     prog_kpis_dict["Endkapital (Optimistisch)"] = f"EUR {val_opt:,.2f}"
-                     prog_kpis_dict["Endkapital (Pessimistisch)"] = f"EUR {val_pess:,.2f}"
-
-                try:
-                    # FIX: Erstelle aktualisierte handover_data mit editierbaren Werten
-                    updated_handover_data = dict(st.session_state.handover_data)
-                    updated_handover_data['budget'] = st.session_state.editable_budget
-                    updated_handover_data['einmalerlag'] = st.session_state.editable_einmalerlag
-                    updated_handover_data['savings_rate'] = st.session_state.editable_sparrate
-                    
-                    pdf_bytes = generate_pdf_report(
+                with st.spinner("Erstelle PDF Report..."):
+                    pdf_bytes = create_pdf_with_charts(
                         assets=st.session_state.assets,
-                        global_params=global_params,
-                        hist_fig=fig_hist,
-                        hist_kpis=hist_kpis_dict,
-                        prog_fig=fig_prog,
-                        prog_kpis=prog_kpis_dict,
-                        handover_data=updated_handover_data,
-                        hist_returns=st.session_state.historical_returns_pa,
-                        prog_returns=st.session_state.prognosis_assumptions_pa,
-                        date_range_hist=range_hist_str,
-                        date_range_prog=range_prog_str
+                        simulations_daten=st.session_state.simulations_daten,
+                        prognose_daten=st.session_state.prognose_daten,
+                        handover_data=st.session_state.handover_data,
+                        historical_returns_pa=st.session_state.historical_returns_pa,
+                        prognosis_assumptions_pa=st.session_state.prognosis_assumptions_pa,
+                        sim_start_date=st.session_state.sim_start_date,
+                        sim_end_date=st.session_state.sim_end_date,
+                        prognose_jahre=st.session_state.prognose_jahre,
+                        cost_ausgabe=st.session_state.cost_ausgabe,
+                        cost_management=st.session_state.cost_management,
+                        cost_depot=st.session_state.cost_depot,
+                        editable_budget=st.session_state.editable_budget,
+                        editable_einmalerlag=st.session_state.editable_einmalerlag,
+                        editable_sparrate=st.session_state.editable_sparrate,
+                        plotting_module=plotting
                     )
+                    
+                    if pdf_bytes is None:
+                        st.toast("⚠️ PDF kann nur bei 100% Gewichtung erstellt werden!", icon="📊")
+                        return
+                    
                     st.session_state[f"pdf_data_{key_suffix}"] = pdf_bytes
                     st.session_state[f"pdf_trigger_{key_suffix}"] = True
-                except Exception as e:
-                    st.error(f"Fehler bei der PDF-Erstellung: {e}")
             
-            # Button zum Starten der Generierung
-            if st.button("📄 PDF Report erstellen & herunterladen", key=f"btn_gen_pdf_{key_suffix}", use_container_width=True, type="primary"):
-                with st.spinner("Erstelle PDF Report..."):
-                    generate_pdf_for_download()
-            
-            # Automatischer JS-Trigger für den Download
+            # JS-Download-Trigger (unverändert)
             if st.session_state.get(f"pdf_trigger_{key_suffix}"):
                 pdf_data = st.session_state[f"pdf_data_{key_suffix}"]
                 b64_pdf = base64.b64encode(pdf_data).decode('utf-8')
                 filename = f"Gutmann_Report_{date.today()}.pdf"
                 
-                # JavaScript zum automatischen Download
                 js_download = f"""
                     <script>
                         var link = document.createElement('a');
@@ -864,12 +774,10 @@ def render():
                         document.body.removeChild(link);
                     </script>
                 """
-                # Nutze st.empty() um Platz zu sparen und Layout-Shifts zu minimieren
                 placeholder = st.empty()
                 with placeholder:
                     components.html(f"<html><body>{js_download}</body></html>", height=0)
                 
-                # Trigger zurücksetzen
                 st.session_state[f"pdf_trigger_{key_suffix}"] = False
                 st.success("✅ Download gestartet!")
         
@@ -947,6 +855,11 @@ def render():
                 st.markdown("---")
                 # PDF BUTTON HISTORIE
                 show_pdf_download_button("hist")
+                
+                # CHECKOUT BUTTON (NEU)
+                from .checkout_service import render_finish_button
+                st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+                render_finish_button("hist")
 
 
 
@@ -1001,13 +914,18 @@ def render():
 
             with var_col_yr:
                 st.markdown("**Prognose-Horizont**")
-                st.number_input(
-                    "Prognose-Horizont (Jahre)",  # FIX Bug #10: Explizit "Jahre" hinzugefügt
-                    min_value=1, max_value=50, value=st.session_state.prognose_jahre, step=1,
+                st.slider(
+                    "Prognose-Horizont (Jahre)", 
+                    min_value=5, max_value=40, value=st.session_state.prognose_jahre, step=1,
                     key="widget_prognose_jahre",
                     on_change=update_prognose_jahre,
-                    help="Zeitraum in Jahren für die Zukunftsprognose"
+                    help="Zeitraum in Jahren für die Zukunftsprognose",
+                    label_visibility="collapsed"
                 )
+                
+                # Zukunfts-Jahr berechnen
+                target_year = date.today().year + st.session_state.prognose_jahre
+                st.caption(f"Prognose bis Jahr: **{target_year}**")
 
             with var_col_ret:
                 st.markdown("**Erwartete Rendite (p.a.) je Titel**")
@@ -1079,6 +997,11 @@ def render():
                     st.markdown("---")
                     # PDF BUTTON PROGNOSE
                     show_pdf_download_button("prog")
+
+                    # CHECKOUT BUTTON (NEU)
+                    from .checkout_service import render_finish_button
+                    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+                    render_finish_button("prog")
     
     # --- CONDITIONAL RERUN AM ENDE ---
     # Wenn Input-Felder geändert wurden, triggere einen Rerun

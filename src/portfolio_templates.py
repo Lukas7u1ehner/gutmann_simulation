@@ -58,10 +58,22 @@ def load_portfolio_template(portfolio_type: str, budget: float, savings_rate: fl
     Returns:
         List of asset dictionaries ready for st.session_state.assets
     """
-    if portfolio_type not in PORTFOLIO_TEMPLATES:
+    # fuzzy matching: check if input string is contained in any key (case insensitive)
+    matched_key = None
+    if portfolio_type in PORTFOLIO_TEMPLATES:
+        matched_key = portfolio_type
+    else:
+        # Versuch: Case-insensitive search
+        norm_type = portfolio_type.lower()
+        for key in PORTFOLIO_TEMPLATES.keys():
+            if norm_type in key.lower() or key.lower() in norm_type:
+                matched_key = key
+                break
+    
+    if not matched_key:
         return []
     
-    template = PORTFOLIO_TEMPLATES[portfolio_type]
+    template = PORTFOLIO_TEMPLATES[matched_key]
     num_assets = len(template["assets"])
     
     loaded_assets = []

@@ -14,7 +14,7 @@ def get_image_as_base64(path):
         st.error(f"Fehler beim Laden des Logos: {e}")
         return ""
 
-LOGO_PATH = "assets/gutmann_logo.png"
+LOGO_PATH = "assets/gutmann_logo-removebg-preview.png"
 GUTMANN_LOGO_URL = get_image_as_base64(LOGO_PATH)
 
 # Definierte Farben (werden unten für das 'Fixed Theme' genutzt)
