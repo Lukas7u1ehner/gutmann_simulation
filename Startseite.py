@@ -183,6 +183,41 @@ div[data-testid="stRadio"] label p {{
 </style>
 """, unsafe_allow_html=True)
 
+# --- ACCESSIBILITY: JavaScript für Tab-Navigation ---
+import streamlit.components.v1 as components
+components.html("""
+<script>
+function makeRadioLabelsAccessible() {
+    const parentDoc = window.parent.document;
+    // NUR die Labels im radiogroup, NICHT das stWidgetLabel darüber
+    const labels = parentDoc.querySelectorAll('div[data-testid="stRadio"] div[role="radiogroup"] label');
+    labels.forEach(function(label) {
+        if (!label.hasAttribute('tabindex')) {
+            label.setAttribute('tabindex', '0');
+        }
+        if (!label.dataset.a11yEnhanced) {
+            label.dataset.a11yEnhanced = 'true';
+            label.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    label.click();
+                }
+            });
+        }
+    });
+}
+makeRadioLabelsAccessible();
+setInterval(makeRadioLabelsAccessible, 500);
+
+// Dieses iframe selbst aus dem Tab-Flow entfernen
+if (window.frameElement) {
+    window.frameElement.setAttribute('tabindex', '-1');
+    window.frameElement.style.outline = 'none';
+    window.frameElement.style.border = 'none';
+}
+</script>
+""", height=0)
+
 
 # --- SESSION STATE INITIALISIERUNG ---
 if "main_nav" not in st.session_state:
@@ -231,7 +266,7 @@ if "prognosis_assumptions_pa" not in st.session_state:
 
 # --- HAUPT-NAVIGATION ---
 # Feedback: Marktanalyse Tab entfernt, da nun integriert
-st.radio(" ", options=["Startseite", "Simulation"], key="main_nav", horizontal=True)
+st.radio("Hauptnavigation", options=["Startseite", "Simulation"], key="main_nav", horizontal=True, label_visibility="collapsed", help="Navigation: Wechseln Sie zwischen Startseite und Simulation")
 
 
 # --- VIEW LOGIK (ROUTING) ---

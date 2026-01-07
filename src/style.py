@@ -69,7 +69,14 @@ def apply_gutmann_style():
     }}
 
     div[data-testid="stRadio"] div[role="radiogroup"] input[type="radio"] {{
-        display: none !important;
+        /* Unsichtbar aber Tab-erreichbar (Accessibility Fix) */
+        opacity: 0 !important;
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
     }}
     div[data-testid="stRadio"] div[role="radiogroup"] label::before {{
         display: none !important;
@@ -213,12 +220,17 @@ def apply_gutmann_style():
     }}
 
     /* --- 6. SEKUNDÄRE BUTTONS (Kosten Einstellungen) --- */
-    .stButton > button[kind="secondary"] {{
+    /* --- 6. SEKUNDÄRE BUTTONS (Kosten Einstellungen & Undo) --- */
+    /* Secondary Style: Heller Hintergrund + Grüne Umrandung */
+    .stButton > button[kind="secondary"],
+    div[data-testid="stButton"] button[kind="secondary"],
+    button[data-testid="baseButton-secondary"] {{
         background-color: {GUTMANN_SECONDARY_DARK} !important;
         color: {GUTMANN_LIGHT_TEXT} !important;
         border: 1px solid {GUTMANN_ACCENT_GREEN} !important;
     }}
-    .stButton > button[kind="secondary"] p {{
+    .stButton > button[kind="secondary"] p,
+    div[data-testid="stButton"] button[kind="secondary"] p {{
         color: {GUTMANN_LIGHT_TEXT} !important;
     }}
 
@@ -318,6 +330,84 @@ def apply_gutmann_style():
     div[data-testid="stMetric"] div[data-testid="stMetricValue"] {{
         color: {GUTMANN_ACCENT_GREEN} !important;
         font-size: 2.0em;
+    }}
+
+    /* --- 10. FOKUS-STYLING FÜR TASTATURNAVIGATION (Accessibility) --- */
+    /* Sichtbarer Fokus-Ring für alle interaktiven Elemente */
+    /* WEIß statt Grün für besseren Kontrast gegen das grüne UI */
+    input:focus,
+    button:focus,
+    select:focus,
+    textarea:focus,
+    [tabindex]:focus {{
+        outline: 2px solid #FFFFFF !important;
+        outline-offset: 2px !important;
+        box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.3) !important;
+    }}
+    
+    /* Fokus für Streamlit-spezifische Elemente */
+    div[data-testid="stSelectbox"] > div:focus-within,
+    div[data-testid="stNumberInput"] > div:focus-within,
+    div[data-testid="stTextInput"] > div:focus-within,
+    div[data-testid="stDateInput"] > div:focus-within {{
+        outline: 2px solid #FFFFFF !important;
+        outline-offset: 1px !important;
+        border-radius: 4px;
+    }}
+    
+    /* Fokus für Radio-Buttons (Tabs) - Weisser Ring um fokussierte Tabs */
+    div[data-testid="stRadio"] label:focus-within {{
+        outline: 2px solid #FFFFFF !important;
+        outline-offset: 2px !important;
+        box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.25) !important;
+    }}
+
+    /* --- 11. MOBILE RESPONSIVE: PRODUKT-TABELLE --- */
+    @media (max-width: 768px) {{
+        /* Produkt-Tabelle: Spalten schmaler oder gestapelt */
+        .product-table div[data-testid="stHorizontalBlock"] {{
+            flex-wrap: wrap !important;
+        }}
+        
+        .product-table div[data-testid="column"] {{
+            min-width: 45% !important;
+            flex: 1 1 45% !important;
+            margin-bottom: 8px !important;
+        }}
+        
+        /* Header ausblenden auf sehr kleinen Screens */
+        .table-header {{
+            display: none !important;
+        }}
+        
+        /* Asset-Reihen als Karten darstellen */
+        .product-table div[data-testid="stVerticalBlockBorder"] {{
+            padding: 12px !important;
+            margin-bottom: 12px !important;
+        }}
+        
+        /* Schriftgrößen für Mobile anpassen */
+        .product-table p {{
+            font-size: 0.9rem !important;
+        }}
+    }}
+    
+    @media (max-width: 480px) {{
+        /* Noch kleinere Screens: Volle Breite pro Element */
+        .product-table div[data-testid="column"] {{
+            min-width: 100% !important;
+            flex: 1 1 100% !important;
+        }}
+    }}
+
+    /* --- 12. INLINE VALIDATION: ROTE UMRANDUNG BEI GEWICHTUNGSFEHLER --- */
+    .weight-error input {{
+        border: 2px solid #ff4444 !important;
+        background-color: rgba(255, 68, 68, 0.1) !important;
+    }}
+    .weight-error input:focus {{
+        outline-color: #ff4444 !important;
+        box-shadow: 0 0 0 4px rgba(255, 68, 68, 0.3) !important;
     }}
 
     </style>

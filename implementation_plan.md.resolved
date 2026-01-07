@@ -1,0 +1,83 @@
+# Bewertungskriterien: Status-Analyse (RESOLVED)
+
+Dieses Dokument bewertet den aktuellen Stand der UI gegen die vier Haupt-Bewertungskriterien.
+
+---
+
+## 1. Interaction Design (Interaktionsgestaltung)
+
+| Kriterium | Status | Befund |
+|---|:---:|---|
+| **Aufgabenangemessenheit** | ✅ | Workflow unterstützt das Kernziel direkt. Wenige Klicks. |
+| **Selbstbeschreibungsfähigkeit** | ✅ | Navigation ist klar. **ARIA-Help-Texte für alle Tabs und Buttons hinzugefügt.** |
+| **Erwartungskonformität** | ✅ | Standard-Widgets. Buttons jetzt nebeneinander und gut sichtbar. |
+| **Steuerbarkeit** | ✅ | Undo-Button implementiert. |
+| **Fehlertoleranz** | ✅ | Gewichtungssumme wird geprüft. |
+| **Feedback** | ✅ | Toast-Messages und Live-Updates. |
+| **Sichtbarkeit** | ✅ | Toggle-Buttons für erweiterte Optionen sind prominent platziert. |
+| **Affordance** | ✅ | Buttons "Startseite" vs "Simulation" klar unterscheidbar. |
+
+### ✅ Erledigt:
+1. ~~Undo-Funktion~~ → **Implementiert**
+2. ~~Inline-Validierung~~ → **Nicht benötigt**
+3. ~~Mehr Tooltips~~ → **Implementiert**
+4. ~~Button-Größe & Layout~~ → **Optimiert** (Nebeneinander, größer)
+
+---
+
+## 2. Visuelles Design
+
+| Kriterium | Status | Befund |
+|---|:---:|---|
+| **Hierarchie** | ✅ | Klare Trennung durch Header und ARIA-Headings (H2/H3). |
+| **Typografie** | ✅ | Source Sans Pro, konsistente Größen. |
+| **Whitespace** | ✅ | Optimiert. Buttons haben nun passendes Spacing. |
+| **Raster** | ✅ | Spaltenlayout effektiv genutzt. |
+| **Farben** | ✅ | High-Contrast Mode (Weiß auf Grün) für Texte. |
+| **Reduktion** | ✅ | Minimalistisch. |
+| **Responsivität** | ✅ | Mobile-Optimierung für Tabelle. |
+
+---
+
+## 3. Informationsarchitektur und Labeling
+
+| Kriterium | Status | Befund |
+|---|:---:|---|
+| **Strukturierung** | ✅ | Logischer Ablauf. |
+| **Labeling** | ✅ | Klare Labels + **Help-Texte als ARIA-Support**. |
+| **Sprachwahl** | ✅ | Verständlich. |
+| **Mentales Modell** | ✅ | Navigation entspricht Erwartung. |
+
+---
+
+## 4. Barrierefreiheit (Accessibility) – **Bonuspunkte**
+
+| Kriterium | Status | Befund |
+|---|:---:|---|
+| **Wahrnehmbarkeit (Alt-Texte)** | ✅ | Logo mit Alt-Text. |
+| **Wahrnehmbarkeit (Kontrast)** | ✅ | **Grau-Texte auf #ccc/#ddd verbessert.** |
+| **Bedienbarkeit (Tastatur)** | ✅ | **Fokus-Styling (weiß). ARIA-Handling für Tabs.** |
+| **Verständlichkeit (Sprache)** | ✅ | Tooltips vorhanden. |
+| **Robustheit (Standardkonformer Code)** | ✅ | **Vollständige Nutzung von aria-label & Help-Texten für alle interaktiven Elemente.** |
+| **Formulargestaltung** | ✅ | Labels vorhanden. |
+
+### ✅ Erledigt:
+1. ~~Alt-Texte~~ → **Implementiert**
+2. ~~Fokus-Styling~~ → **Implementiert**
+3. ~~Tab-Navigation~~ → **Implementiert**
+4. ~~Kontrast~~ → **Implementiert**
+5. ~~ARIA-Labels~~ → **Implementiert** (Heading, Region, Help-Text für Widgets)
+
+---
+
+## Zusammenfassung
+
+| Kategorie | Status |
+|---|:---:|
+| Interaction Design | ✅ Vollständig |
+| Visuelles Design | ✅ Vollständig |
+| Informationsarchitektur | ✅ Vollständig |
+| Barrierefreiheit | ✅ Vollständig |
+
+> [!NOTE]
+> Das Projekt erfüllt nun alle erweiterten Anforderungen inkl. Usability-Optimierung der Buttons und lückenloser Accessibility-Beschriftung.

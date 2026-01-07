@@ -15,7 +15,7 @@ def render():
     # Spalten: [Titel/Status - Logo - Leer]
     # 1. Header Area (Logo Only, Centered)
     st.markdown(f"""
-    <div style="display: flex; justify-content: center; align-items: center; margin-top: 20px; margin-bottom: 30px;">
+    <div style="display: flex; justify-content: center; align-items: center; margin-top: 20px; margin-bottom: 30px;" role="banner" aria-label="Header mit Firmenlogo">
         <img src="{GUTMANN_LOGO_URL}" alt="Bank Gutmann Logo" style="width: 400px; max-width: 90%; height: auto;">
     </div>
     """, unsafe_allow_html=True)
@@ -25,7 +25,7 @@ def render():
     
     # Große Action Card
     st.markdown(f"""
-    <div style="background-color: {GUTMANN_SECONDARY_DARK}; padding: 20px; border-radius: 8px; border-left: 6px solid {GUTMANN_ACCENT_GREEN}; margin-bottom: 20px;">
+    <div style="background-color: {GUTMANN_SECONDARY_DARK}; padding: 20px; border-radius: 8px; border-left: 6px solid {GUTMANN_ACCENT_GREEN}; margin-bottom: 20px;" role="region" aria-label="Neues Kundengespräch">
         <h3 style="color: {GUTMANN_ACCENT_GREEN}; margin-top:0;">Neues Kundengespräch</h3>
         <p style="color: {GUTMANN_LIGHT_TEXT}; font-size: 1.0rem;">Starten Sie eine neue Simulation. Konfigurieren Sie Portfolio, Sparpläne und Szenarien.</p>
     </div>

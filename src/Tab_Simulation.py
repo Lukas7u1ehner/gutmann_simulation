@@ -60,7 +60,7 @@ def render():
     header_col1, header_col2, header_col3 = st.columns([0.5, 0.5, 2])  # 30% schmaler!
     
     with header_col1:
-        st.markdown("**BERATER**")
+        st.markdown('<div role="heading" aria-level="2" style="font-weight: bold; color: white;">BERATER</div>', unsafe_allow_html=True)
         st.text_input(
             "Name des Beraters", 
             value=handover.get("advisor", "Mag. Anna Berger")[:30],
@@ -70,7 +70,7 @@ def render():
         )
     
     with header_col2:
-        st.markdown("**KUNDE**")
+        st.markdown('<div role="heading" aria-level="2" style="font-weight: bold; color: white;">KUNDE</div>', unsafe_allow_html=True)
         st.text_input(
             "Name des Kunden", 
             value=handover.get("client", "Max Mustermann")[:30],
@@ -81,7 +81,7 @@ def render():
     
     with header_col3:
         # Header für Portfolio Bereich
-        st.markdown("**PORTFOLIO-ÜBERSICHT**")
+        st.markdown('<div role="heading" aria-level="2" style="font-weight: bold; color: white;">PORTFOLIO-ÜBERSICHT</div>', unsafe_allow_html=True)
         
         # --- REACTIVE CALCULATION: Werte werden nun editierbar und triggern Neuberechnung ---
         # Initialisiere editierbare Werte in Session State (falls nicht vorhanden)
@@ -121,6 +121,7 @@ def render():
                     key="editable_budget",
                     format="%.0f",
                     on_change=on_budget_change,
+                    help="Das maximale Gesamtbudget, das der Kunde investieren möchte.",
                 )
             with r1c2:
                 # Einmalerlag OHNE max_value (verhindert Reset bei Budget-Änderung)
@@ -132,6 +133,7 @@ def render():
                     key="editable_einmalerlag",
                     format="%.0f",
                     on_change=recalculate_assets_from_totals,
+                    help="Einmaliger Anlagebetrag zu Beginn der Investition.",
                 )
             with r1c3:
                 st.number_input(
@@ -141,6 +143,7 @@ def render():
                     key="editable_sparrate",
                     format="%.0f",
                     on_change=recalculate_assets_from_totals,
+                    help="Regelmäßiger Sparbetrag, der laufend investiert wird.",
                 )
             with r1c4:
                 # Portfolio-Type Anzeige (ohne Trunkierung für Konsistenz)
@@ -320,11 +323,11 @@ def render():
     col_main, col_spacer = st.columns([0.55, 0.45])
     
     with col_main:
-        # Wrapper für das gesamte Product-Table Layout
-        st.markdown('<div class="product-table">', unsafe_allow_html=True)
+        # Wrapper für das gesamte Product-Table Layout mit ARIA
+        st.markdown('<div class="product-table" role="table" aria-label="Portfolio-Übersicht">', unsafe_allow_html=True)
         
         # HEADER ROW - Centered via CSS
-        st.markdown('<div class="table-header">', unsafe_allow_html=True)
+        st.markdown('<div class="table-header" role="rowgroup" aria-label="Spaltenüberschriften">', unsafe_allow_html=True)
         h1, h2, h3, h4, h5, h6, h7 = st.columns([1.5, 1.5, 1, 1.2, 1.2, 1.2, 0.5])
         
         with h1:
@@ -357,7 +360,7 @@ def render():
                     st.markdown(f'<p>{name}</p>', unsafe_allow_html=True)
                 
                 with c2:
-                    st.markdown(f'<p style="color: #999; font-size: 0.85em;">{ticker}</p>', unsafe_allow_html=True)
+                    st.markdown(f'<p style="color: #ccc; font-size: 0.85em;">{ticker}</p>', unsafe_allow_html=True)
                 
                 with c3:
                     # Gewichtung als Text-Input (ohne +/-)
@@ -424,13 +427,46 @@ def render():
                     )
                 
                 with c7:
-                    # Delete als plain emoji (kein Button-Style)
+                    # Delete mit Undo-Funktion
                     if st.button("🗑️", key=f"delete_{idx}", help="Titel löschen", use_container_width=False):
-                        st.session_state.assets.pop(idx)
-                        # KEINE automatische Neuverteilung - User behält Kontrolle!
-                        st.session_state.needs_rerun = True
+                        # Speichere das Asset für Undo statt direktem Löschen
+                        deleted_asset = st.session_state.assets.pop(idx)
+                        st.session_state.deleted_asset = {
+                            "asset": deleted_asset,
+                            "index": idx
+                        }
+                        st.session_state.undo_button_shown = False  # False beim Löschen!
+                        st.rerun()  # Expliziter Rerun statt needs_rerun
         
-        st.markdown('</div>', unsafe_allow_html=True)
+        # Initialize flag for undo button visibility
+        if "undo_button_shown" not in st.session_state:
+            st.session_state.undo_button_shown = False
+        
+        # --- UNDO BUTTON (bleibt bis zur nächsten User-Aktion) ---
+        if st.session_state.get("deleted_asset"):
+            deleted_info = st.session_state.deleted_asset
+            deleted_name = deleted_info["asset"].get("Name", "Unbekannt")
+            
+            # Zeige Button und prüfe Click
+            col_undo, _ = st.columns([0.55, 0.45])
+            with col_undo:
+                undo_clicked = st.button(f'"{deleted_name}" wiederherstellen', key="undo_delete", type="secondary")
+            
+            if undo_clicked:
+                # User hat Undo geklickt → Asset wiederherstellen
+                original_idx = min(deleted_info["index"], len(st.session_state.assets))
+                st.session_state.assets.insert(original_idx, deleted_info["asset"])
+                st.session_state.deleted_asset = None
+                st.session_state.undo_button_shown = False
+                st.rerun()
+            elif st.session_state.undo_button_shown:
+                # Button war schon sichtbar, User hat was ANDERES gemacht → aufräumen + rerun
+                st.session_state.deleted_asset = None
+                st.session_state.undo_button_shown = False
+                st.rerun()  # Sofort neuladen damit Button verschwindet
+            else:
+                # Markiere dass Button jetzt sichtbar ist
+                st.session_state.undo_button_shown = True
     
     # --- Gewichtungs-Summe anzeigen (SEHR KOMPAKT, OHNE HINTERGRUND) ---
     total_weight = sum(a.get("Gewichtung (%)", 0) for a in st.session_state.assets)
@@ -444,7 +480,7 @@ def render():
         
         st.markdown(
             f"<div style='padding:6px 0;'>" 
-            f"<span style='font-size:0.85em; color:gray;'>Gesamtgewichtung:</span> "
+            f"<span style='font-size:0.85em; color:#ddd;'>Gesamtgewichtung:</span> "
             f"<span style='font-size:1.1em; font-weight:bold;'>{total_weight:.1f}%</span> "
             f"<span style='font-size:0.85em; color:{status_color};'>{status_text}</span>"
             f"</div>",
@@ -492,6 +528,7 @@ def render():
                 "Bitte passen Sie die Positionen an, bis die Summe wieder im Rahmen liegt.",
                 icon="🚨"
             )
+            st.markdown('<div role="status" aria-live="polite" aria-label="Budget Warnung aktiv"></div>', unsafe_allow_html=True)
     
     st.markdown('<div style="margin-bottom: 30px;"></div>', unsafe_allow_html=True)
 
@@ -512,16 +549,17 @@ def render():
     def toggle_cost_settings():
         st.session_state.show_cost_settings = not st.session_state.show_cost_settings
 
-    # Beide Buttons nebeneinander
-    col_add_btn, col_cost_btn, col_spacer = st.columns([1.5, 1.5, 1])
+    # Beide Buttons nebeneinander (Größer & Kompakt)
+    # Ratio [1, 1, 1.5] macht die Buttons ca. 30% breiter als vorher ([0.25...])
+    col_add_btn, col_cost_btn, col_spacer = st.columns([1, 1, 1.5])
     
     with col_add_btn:
-        btn_label_add = "Titel verbergen" if st.session_state.show_add_form else "Titel zum Portfolio hinzufügen"
-        st.button(btn_label_add, use_container_width=True, on_click=toggle_add_form)
+        btn_label_add = "Titel verbergen" if st.session_state.show_add_form else "Titel hinzufügen"
+        st.button(btn_label_add, on_click=toggle_add_form, use_container_width=True, help="Titel zum Portfolio hinzufügen oder verbergen")
     
     with col_cost_btn:
-        btn_label_cost = "Kosten verbergen" if st.session_state.show_cost_settings else "Kosten Einstellungen anzeigen"
-        st.button(btn_label_cost, use_container_width=True, on_click=toggle_cost_settings)
+        btn_label_cost = "Kosten verbergen" if st.session_state.show_cost_settings else "Kosten anzeigen"
+        st.button(btn_label_cost, on_click=toggle_cost_settings, use_container_width=True, help="Kosten Einstellungen anzeigen oder verbergen")
 
 
     # Add Form (wenn sichtbar)
@@ -606,11 +644,23 @@ def render():
         with st.container(border=True):
             c1, c2, c3 = st.columns(3)
             with c1:
-                st.session_state.cost_ausgabe = st.number_input("Ausgabeaufschlag (%)", 0.0, 10.0, value=st.session_state.cost_ausgabe, step=0.1)
+                st.session_state.cost_ausgabe = st.number_input(
+                    "Ausgabeaufschlag (%)", 0.0, 10.0, 
+                    value=st.session_state.cost_ausgabe, step=0.1,
+                    help="Einmalige Gebühr beim Kauf eines Fonds, wird vom Anlagebetrag abgezogen."
+                )
             with c2:
-                st.session_state.cost_management = st.number_input("Managementgebühr (% p.a.)", 0.0, 10.0, value=st.session_state.cost_management, step=0.01)
+                st.session_state.cost_management = st.number_input(
+                    "Managementgebühr (% p.a.)", 0.0, 10.0, 
+                    value=st.session_state.cost_management, step=0.01,
+                    help="Jährliche Verwaltungsgebühr, die vom Fondsvermögen abgezogen wird."
+                )
             with c3:
-                st.session_state.cost_depot = st.number_input("Depotgebühr (€ p.a.)", 0.0, value=st.session_state.cost_depot, step=1.0)
+                st.session_state.cost_depot = st.number_input(
+                    "Depotgebühr (€ p.a.)", 0.0, 
+                    value=st.session_state.cost_depot, step=1.0,
+                    help="Jährliche Gebühr für die Verwahrung des Depots."
+                )
 
 
     # --- 3. AUTOMATISCHE BERECHNUNG (HISTORIE) ---
@@ -713,7 +763,8 @@ def render():
             key="sim_sub_nav_widget", 
             on_change=update_sub_nav,
             horizontal=True,
-            label_visibility="collapsed"
+            label_visibility="collapsed",
+            help="Ansicht: Wählen Sie zwischen Historischer Simulation und Zukunftsprognose"
         )
         
         # --- PDF REPORT LOGIK ---
@@ -818,7 +869,8 @@ def render():
                     index=1,
                     horizontal=True,
                     label_visibility="collapsed",
-                    key="widget_show_phases"
+                    key="widget_show_phases",
+                    help="Marktphasen im Chart farblich hervorheben (Ja/Nein)"
                 )
                 show_market_phases = (phases_radio == "Ja")
 
@@ -847,10 +899,10 @@ def render():
                 total_investment = last_row["Einzahlungen (brutto)"]
                 rendite_nominal_prozent = ((end_value_nominal / total_investment) - 1) * 100 if total_investment > 0 else 0
                 
-                st.metric("Gesamteinzahlung", f"€ {total_investment:,.2f}")
-                st.metric("Endkapital (nominal)", f"€ {end_value_nominal:,.2f}")
+                st.metric("Gesamteinzahlung", f"€ {total_investment:,.2f}", help="Summe aller getätigten Einzahlungen (Einmalerlag + Sparraten).")
+                st.metric("Endkapital (nominal)", f"€ {end_value_nominal:,.2f}", help="Wert des Portfolios ohne Inflationsanpassung.")
                 st.metric("Endkapital (real)", f"€ {end_value_real:,.2f}", help="Kaufkraftbereinigt (basierend auf HICP Daten)")
-                st.metric("Gesamtrendite (nom.)", f"{rendite_nominal_prozent:,.2f} %")
+                st.metric("Gesamtrendite (nom.)", f"{rendite_nominal_prozent:,.2f} %", help="Prozentuale Rendite auf Basis des nominalen Endkapitals.")
                 
                 st.markdown("---")
                 # PDF BUTTON HISTORIE
@@ -913,7 +965,7 @@ def render():
             var_col_yr, var_col_ret = st.columns([1, 2])
 
             with var_col_yr:
-                st.markdown("**Prognose-Horizont**")
+                st.markdown('<div role="heading" aria-level="3">**Prognose-Horizont**</div>', unsafe_allow_html=True)
                 st.slider(
                     "Prognose-Horizont (Jahre)", 
                     min_value=5, max_value=40, value=st.session_state.prognose_jahre, step=1,
@@ -928,7 +980,7 @@ def render():
                 st.caption(f"Prognose bis Jahr: **{target_year}**")
 
             with var_col_ret:
-                st.markdown("**Erwartete Rendite (p.a.) je Titel**")
+                st.markdown('<div role="heading" aria-level="3">**Erwartete Rendite (p.a.) je Titel**</div>', unsafe_allow_html=True)
                 current_asset_names = list(st.session_state.prognosis_assumptions_pa.keys())
 
                 if current_asset_names:
@@ -966,7 +1018,7 @@ def render():
                     st.plotly_chart(fig_prog, use_container_width=True)
                     
                     st.markdown(f"""
-                    <div style="background-color: {GUTMANN_SECONDARY_DARK}; padding: 15px; border-radius: 5px; border-left: 5px solid {GUTMANN_ACCENT_GREEN}; color: {GUTMANN_LIGHT_TEXT}; font-size: 0.95em;">
+                    <div style="background-color: {GUTMANN_SECONDARY_DARK}; padding: 15px; border-radius: 5px; border-left: 5px solid {GUTMANN_ACCENT_GREEN}; color: {GUTMANN_LIGHT_TEXT}; font-size: 0.95em;" role="region" aria-label="Lesehilfe zur Grafik">
                         <strong style="color: {GUTMANN_ACCENT_GREEN}; font-size: 1.05em;">ℹ️ Lesehilfe zur Grafik:</strong><br>
                         <ul style="margin-top: 5px; padding-left: 20px; margin-bottom: 0;">
                             <li>Das <b>Optimistische Szenario (95%)</b> zeigt eine Entwicklung, die statistisch nur in besonders guten Marktphasen erreicht wird.</li>
@@ -990,7 +1042,7 @@ def render():
                     
                     st.metric("Startkapital (Geplant)", f"€ {start_capital_planned:,.2f}", help="Summe der Einmalerläge aus der Asset-Liste")
                     st.metric("+ Zukünftige Sparraten", f"€ {future_savings_sum:,.2f}", help="Summe der Sparraten in der Prognose-Zeit")
-                    st.metric("Endkapital (Median, nom.)", f"€ {end_val_nom:,.2f}")
+                    st.metric("Endkapital (Median, nom.)", f"€ {end_val_nom:,.2f}", help="Der wahrscheinlichste Endwert (50% Chance höher/niedriger).")
                     st.metric("Rendite (auf Gesamt)", f"{rendite_nom:,.2f} %", help="Rendite bezogen auf Startkapital + Sparraten")
                     st.metric("Endkapital (real)", f"€ {end_val_real:,.2f}", help="Kaufkraftbereinigt nach Inflationsmodell")
                     
