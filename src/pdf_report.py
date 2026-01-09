@@ -36,11 +36,12 @@ Die Bank Gutmann AG übernimmt keine Haftung für die Richtigkeit, Aktualität o
 
 GLOSSAR_TEXT = {
     "Startkapital": "Das Kapital, welches zu Beginn der Simulation einmalig in das Portfolio investiert wird.",
-    "Sparrate (monatlich)": "Ein regelmäßiger Investitionsbetrag, der im gewählten Intervall (z.B. monatlich) zum Portfolio hinzugefügt wird.",
+    "Laufender Betrag": "Ein regelmäßiger Investitionsbetrag, der im gewählten Intervall (z.B. monatlich) zum Portfolio hinzugefügt wird.",
     "Historische Simulation": "Eine Analyse, die zeigt, wie sich das definierte Portfolio in einem vergangenen Zeitraum entwickelt hätte. Dabei werden reale, historische Marktdaten verwendet, um die Performance unter echten Marktbedingungen zu veranschaulichen.",
     "Zukunftsprognose (Monte Carlo)": "Eine statistische Simulationstechnik, die tausende möglicher zukünftiger Marktentwicklungen berechnet. Sie basiert auf den erwarteten Renditen und der Volatilität (Schwankungsbreite) der Portfolio-Bausteine.",
     "Median-Prognose": "Der mittlere Entwicklungspfad der Zukunftssimulation. Das bedeutet, dass die Wahrscheinlichkeit für ein besseres oder schlechteres Ergebnis jeweils bei 50 % liegt. Dies ist das statistisch wahrscheinlichste Szenario.",
-    "Nominal vs. Real": "Nominal bezeichnet den reinen Geldwert ohne Berücksichtigung der Geldentwertung (Inflation).\nReal bezeichnet den um die Inflation bereinigten Wert, der die tatsächliche Kaufkraft widerspiegelt.",
+    "Max. Drawdown": "Der größte prozentuale Wertverlust eines Portfolios vom Höchststand bis zum Tiefpunkt innerhalb eines bestimmten Zeitraums. Er zeigt das maximale Verlustrisiko, das ein Anleger in der Vergangenheit erfahren hätte.",
+    "Nominal vs. Real": "Nominal bezeichnet den reinen Geldwert ohne Berücksichtigung der Geldentwertung (Inflation).\\nReal bezeichnet den um die Inflation bereinigten Wert, der die tatsächliche Kaufkraft widerspiegelt.",
     "Volatilität": "Ein Maß für die Schwankungsbreite eines Wertpapierkurses. Eine höhere Volatilität bedeutet größere Kursschwankungen und damit potenziell höheres Risiko, aber auch höhere Chancen.",
     "Rendite": "Der Gesamtertrag einer Kapitalanlage, ausgedrückt in Prozent pro Jahr (p.a.) oder als absoluter Wert, unter Berücksichtigung von Kursgewinnen und Ausschüttungen.",
     "Gewichtung": "Der prozentuale Anteil einer einzelnen Position am Gesamtportfolio. Die Summe aller Gewichtungen ergibt idealerweise 100 %.",
@@ -134,7 +135,7 @@ class GutmannReport(FPDF):
         now = datetime.now().strftime("%d.%m.%Y, %H:%M Uhr")
         self.cell(0, 10, f"Erstellt am: {now}", align="C", new_x="LMARGIN", new_y="NEXT")
 
-    def create_portfolio_page(self, assets, params, handover_data=None):
+    def create_portfolio_page(self, assets, params, handover_data=None, pie_chart_bytes=None):
         self.add_page()
         self.section_title("1. Portfolio & Eingaben")
         
@@ -158,15 +159,15 @@ class GutmannReport(FPDF):
             # Erste Zeile
             y_start = self.get_y()
             
-            # Labels fett, Werte normal
-            def print_key_val(label, value, x_offset):
+            # Labels fett, Werte normal - RESPONSIVE Layout
+            def print_key_val(label, value, x_offset, label_width=50):
                 self.set_x(x_offset)
-                self.set_font("Helvetica", "B", 10)
+                self.set_font("Helvetica", "B", 9)
                 self.set_text_color(*COLOR_DARK_GREEN)
-                self.cell(40, 6, label, 0)
-                self.set_font("Helvetica", "", 10)
+                self.cell(label_width, 6, label, 0)
+                self.set_font("Helvetica", "", 9)
                 self.set_text_color(0, 0, 0)
-                self.cell(50, 6, value, 0)
+                self.cell(45, 6, value, 0)
 
             # Block 1 (Links)
             print_key_val("Kunde:", clean_text(client), start_x)
@@ -179,9 +180,8 @@ class GutmannReport(FPDF):
             print_key_val("Einmalerlag:", f"EUR {einmal_v}", start_x + col_w + 10)
             self.ln(6)
             
-            # Dritte Zeile
-            print_key_val("Sparrate (Gesamt):", f"EUR {spar_v}", start_x + col_w + 10)
-            print_key_val("Portfolio Typ:", clean_text(portfolio_type) if portfolio_type else "Manuell", start_x) # NEW V4
+            # Dritte Zeile - NUR Laufender Betrag (Portfolio Typ entfernt)
+            print_key_val("Laufender Betrag (Gesamt):", f"EUR {spar_v}", start_x + col_w + 10)
             self.ln(12)
 
         # Settings Block (Kompakter & Vertikal)
@@ -214,9 +214,9 @@ class GutmannReport(FPDF):
         self.set_text_color(0, 0, 0)
         self.set_font("Helvetica", "B", 9)
         
-        # Breiten angepasst für Gewichtung
-        cols = [60, 30, 25, 25, 25, 25] 
-        headers = ["Name", "ISIN", "Gewichtung", "Start (EUR)", "Sparrate", "Intervall"]
+        # Breiten angepasst für breitere Spalten (Total: 190mm)
+        cols = [50, 28, 22, 28, 32, 30] 
+        headers = ["Name", "ISIN", "Gew.", "Start (EUR)", "Laufend (EUR)", "Intervall"]
         
         for i, h in enumerate(headers):
             # ZENTRIERT (außer Name)
@@ -229,12 +229,20 @@ class GutmannReport(FPDF):
         for asset in assets:
             if not asset.get("ISIN / Ticker"): continue
             
-            name = clean_text(asset.get("Name", ""))[:35]
+            name = clean_text(asset.get("Name", ""))[:30]
             isin = clean_text(asset.get("ISIN / Ticker", ""))
             weight = f"{asset.get('Gewichtung (%)', 0):.1f} %"
-            start = f"{asset.get('Einmalerlag (€)', 0):,.2f}"
-            spar = f"{asset.get('Sparbetrag (€)', 0):,.2f}"
-            inter = clean_text(asset.get("Spar-Intervall", ""))[:10]
+            start = f"{asset.get('Einmalerlag (€)', 0):,.0f}"
+            spar = f"{asset.get('Sparbetrag (€)', 0):,.0f}"
+            
+            # Intervall-Abkürzungen für bessere Lesbarkeit
+            interval_map = {
+                "monatlich": "monatl.",
+                "vierteljährlich": "viertelj.",
+                "jährlich": "jährl."
+            }
+            raw_inter = asset.get("Spar-Intervall", "")
+            inter = interval_map.get(raw_inter, raw_inter)
             
             data = [name, isin, weight, start, spar, inter]
             # ZENTRIERT (außer Name)
@@ -243,6 +251,24 @@ class GutmannReport(FPDF):
             for i, d in enumerate(data):
                 self.cell(cols[i], 8, d, border="B", align=aligns[i])
             self.ln()
+        
+        # --- PIE CHART (nach Portfolio Positionen) ---
+        if pie_chart_bytes:
+            self.ln(10)
+            self.set_font("Helvetica", "B", 11)
+            self.set_text_color(*COLOR_DARK_GREEN)
+            self.cell(0, 8, "Gewichtungsverteilung", new_x="LMARGIN", new_y="NEXT")
+            self.ln(2)
+            
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                tmp.write(pie_chart_bytes)
+                tmp_path = tmp.name
+            try:
+                # Zentriertes Pie Chart
+                self.image(tmp_path, x=50, w=110, h=70)
+            finally:
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
 
     def create_returns_table(self, title, returns_data, suffix_label="(p.a.)"):
         """Erstellt eine Tabelle für Renditen (Historisch oder Prognose)"""
@@ -317,12 +343,32 @@ class GutmannReport(FPDF):
             self.set_line_width(0.4)
             
             for k, v in kpi_dict.items():
-                self.set_font("Helvetica", "", 10)
-                self.set_text_color(0, 0, 0) # Schwarz
-                self.cell(100, 7, clean_text(k), border="B") # Label
-                
-                self.set_font("Helvetica", "B", 10)
-                self.cell(0, 7, clean_text(v), border="B", align="R", new_x="LMARGIN", new_y="NEXT") # Wert
+                # Spezialbehandlung für Max. Drawdown (zwei Zeilen)
+                if k == "Max. Drawdown" and "(" in v:
+                    # Extrahiere % und Zeitraum
+                    parts = v.split("(")
+                    dd_pct = parts[0].strip()
+                    dd_range = parts[1].rstrip(")").strip() if len(parts) > 1 else ""
+                    
+                    self.set_font("Helvetica", "", 10)
+                    self.set_text_color(0, 0, 0)
+                    self.cell(100, 7, clean_text(k), border=0)  # Label ohne Border
+                    
+                    self.set_font("Helvetica", "B", 10)
+                    self.cell(0, 7, dd_pct, border=0, align="R", new_x="LMARGIN", new_y="NEXT")
+                    
+                    # Zeitraum in kleinerer Schrift
+                    self.set_font("Helvetica", "I", 8)
+                    self.set_text_color(100, 100, 100)
+                    self.cell(100, 5, "", border="B")  # Leere Label-Zelle mit Border
+                    self.cell(0, 5, dd_range, border="B", align="R", new_x="LMARGIN", new_y="NEXT")
+                else:
+                    self.set_font("Helvetica", "", 10)
+                    self.set_text_color(0, 0, 0)  # Schwarz
+                    self.cell(100, 7, clean_text(k), border="B")  # Label
+                    
+                    self.set_font("Helvetica", "B", 10)
+                    self.cell(0, 7, clean_text(v), border="B", align="R", new_x="LMARGIN", new_y="NEXT")  # Wert
                 
         # Wenn detaillierte Renditen im Argument sind, Tabelle anzeigen
         if detailed_returns:
@@ -367,12 +413,12 @@ class GutmannReport(FPDF):
             self.ln(6)
 
 
-def generate_pdf_report(assets, global_params, hist_fig, hist_kpis, prog_fig, prog_kpis, handover_data=None, hist_returns=None, prog_returns=None, date_range_hist=None, date_range_prog=None):
+def generate_pdf_report(assets, global_params, hist_fig, hist_kpis, prog_fig, prog_kpis, handover_data=None, hist_returns=None, prog_returns=None, date_range_hist=None, date_range_prog=None, pie_chart_bytes=None):
     pdf = GutmannReport()
     
     # 1. Deckblatt & Portfolio
     pdf.create_title_page()
-    pdf.create_portfolio_page(assets, global_params, handover_data)
+    pdf.create_portfolio_page(assets, global_params, handover_data, pie_chart_bytes=pie_chart_bytes)
     
     # 2. Historie
     hist_img = None
@@ -446,13 +492,25 @@ def build_history_kpis(simulations_daten: pd.DataFrame) -> dict:
     profit = end_val - total_invest
     rendite_abs = (profit / total_invest * 100) if total_invest > 0 else 0
     
-    return {
+    kpis = {
         "Gesamteinzahlung": f"EUR {total_invest:,.2f}",
         "Endkapital (nominal)": f"EUR {end_val:,.2f}",
         "Gewinn/Verlust": f"EUR {profit:,.2f}",
         "Rendite (absolut)": f"{rendite_abs:.2f} %",
         "Endkapital (real)": f"EUR {last_row['Portfolio (real)']:,.2f}"
     }
+    
+    # Max Drawdown berechnen
+    try:
+        from . import portfolio_logic
+        max_dd, peak_date, trough_date = portfolio_logic.calculate_max_drawdown(simulations_daten)
+        if max_dd < 0 and peak_date is not None:
+            dd_range = f"{peak_date.strftime('%d.%m.%Y')} - {trough_date.strftime('%d.%m.%Y')}"
+            kpis["Max. Drawdown"] = f"{max_dd:.1f} % ({dd_range})"
+    except Exception:
+        pass
+    
+    return kpis
 
 def build_prognose_kpis(prognose_daten: pd.DataFrame) -> dict:
     """Erstellt KPI-Dictionary für Zukunftsprognose."""
@@ -534,6 +592,26 @@ def create_pdf_with_charts(
             title="Zukunftsprognose"
         )
     
+    # Pie Chart für PDF erstellen (mit weißem Hintergrund für Print)
+    pie_chart_bytes = None
+    pie_fig = plotting_module.create_weight_pie_chart(assets)
+    if pie_fig:
+        pie_fig.update_layout(
+            paper_bgcolor="white",
+            plot_bgcolor="white",
+            font_color="black",
+            # Annotation Text auf schwarz setzen
+            annotations=[dict(
+                text="<b>Gewichtung</b>",
+                x=0.5, y=0.5,
+                font=dict(size=14, color="black"),
+                showarrow=False
+            )]
+        )
+        # Update text color for print
+        pie_fig.update_traces(textfont=dict(color="black"))
+        pie_chart_bytes = pie_fig.to_image(format="png", width=800, height=500, scale=2)
+    
     # KPIs bauen
     hist_kpis = build_history_kpis(simulations_daten)
     prog_kpis = build_prognose_kpis(prognose_daten)
@@ -557,5 +635,6 @@ def create_pdf_with_charts(
         hist_returns=historical_returns_pa,
         prog_returns=prognosis_assumptions_pa,
         date_range_hist=range_hist_str,
-        date_range_prog=range_prog_str
+        date_range_prog=range_prog_str,
+        pie_chart_bytes=pie_chart_bytes
     )

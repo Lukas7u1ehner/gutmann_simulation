@@ -109,9 +109,12 @@ def render():
             if st.session_state.editable_einmalerlag > st.session_state.editable_budget:
                 st.session_state.editable_einmalerlag = st.session_state.editable_budget
         
-        # Premium 1x4 Grid (eine Reihe) - JETZT EDITIERBAR
-        with st.container(border=True):
-            r1c1, r1c2, r1c3, r1c4 = st.columns(4)
+        # Premium Grid mit leerem Bereich rechts (Portfolio Übersicht kleiner)
+        col_portfolio, col_empty = st.columns([0.8, 0.2])
+        
+        with col_portfolio:
+            with st.container(border=True):
+                r1c1, r1c2, r1c3 = st.columns(3)
             
             with r1c1:
                 st.number_input(
@@ -137,18 +140,15 @@ def render():
                 )
             with r1c3:
                 st.number_input(
-                    "Sparrate (€)",
+                    "Laufender Betrag",
                     min_value=0.0,
                     step=100.0,
                     key="editable_sparrate",
                     format="%.0f",
                     on_change=recalculate_assets_from_totals,
-                    help="Regelmäßiger Sparbetrag, der laufend investiert wird.",
+                    help="Regelmäßiger Investitionsbetrag pro Intervall.",
                 )
-            with r1c4:
-                # Portfolio-Type Anzeige (ohne Trunkierung für Konsistenz)
-                display_type = str(portfolio_type_display) if portfolio_type_display else "Manuell"
-                st.metric("Portfolio Type", display_type)
+            # Portfolio Type wird nicht mehr angezeigt (ausgeblendet)
 
     # Budget Limit für spätere Verwendung (Sidebar Warnung)
     budget_limit = st.session_state.editable_budget
@@ -319,8 +319,41 @@ def render():
     </style>
     """, unsafe_allow_html=True)
     
-    # Layout für Tabelle (Links 55%, Rechts für Hilfe/Info 45%)
-    col_main, col_spacer = st.columns([0.55, 0.45])
+    # Layout für Tabelle (Links 55%, Rechts für Pie Chart 45%)
+    col_main, col_chart = st.columns([0.55, 0.45])
+    
+    with col_chart:
+        # Berechne Gesamtgewichtung für Pie Chart Logik
+        total_weight_for_pie = sum(a.get("Gewichtung (%)", 0) for a in st.session_state.assets)
+        
+        if total_weight_for_pie > 100:
+            # Gewichtung über 100% → Fehlermeldung anzeigen
+            st.markdown(
+                """
+                <div style="
+                    display: flex; 
+                    align-items: center; 
+                    justify-content: center; 
+                    height: 300px;
+                    border: 2px dashed #ff6b6b;
+                    border-radius: 10px;
+                    background-color: rgba(255, 107, 107, 0.1);
+                    margin: 20px;
+                ">
+                    <div style="text-align: center; color: #ff6b6b;">
+                        <p style="font-size: 2em; margin: 0;">⚠️</p>
+                        <p style="font-size: 1.1em; font-weight: bold; margin: 10px 0;">Gewichtung über 100%</p>
+                        <p style="font-size: 0.9em; color: #ccc;">Bitte reduzieren Sie die Gewichtungen.</p>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        elif total_weight_for_pie > 0:
+            # Gewichtung zwischen 0% und 100% → Pie Chart anzeigen
+            pie_fig = plotting.create_weight_pie_chart(st.session_state.assets)
+            st.plotly_chart(pie_fig, use_container_width=True, key="weight_pie_chart")
+        # Bei 0% Gewichtung → nichts anzeigen (kein else-Block)
     
     with col_main:
         # Wrapper für das gesamte Product-Table Layout mit ARIA
@@ -339,9 +372,9 @@ def render():
         with h4:
             st.markdown("**Einmalbetrag (€)**")
         with h5:
-            st.markdown("**Sparbetrag (€)**")
+            st.markdown("**Laufender Betrag**")
         with h6:
-            st.markdown("**Spar-Intervall**")
+            st.markdown("**Intervall**")
         with h7:
             st.markdown("")  # Empty for delete button
         st.markdown('</div>', unsafe_allow_html=True)
@@ -687,6 +720,9 @@ def render():
     
     assets_to_simulate = [asset for asset in st.session_state.assets if asset.get("ISIN / Ticker")]
     
+    # Initialisierung VOR den Bedingungsblöcken (verhindert NameError)
+    simulation_successful = False
+    
     if assets_to_simulate:
         if needs_recalc:
             with st.spinner("Berechne Portfolio..."):
@@ -904,6 +940,18 @@ def render():
                 st.metric("Endkapital (real)", f"€ {end_value_real:,.2f}", help="Kaufkraftbereinigt (basierend auf HICP Daten)")
                 st.metric("Gesamtrendite (nom.)", f"{rendite_nominal_prozent:,.2f} %", help="Prozentuale Rendite auf Basis des nominalen Endkapitals.")
                 
+                # Max Drawdown KPI (NEU)
+                max_dd, peak_date, trough_date = portfolio_logic.calculate_max_drawdown(st.session_state.simulations_daten)
+                if max_dd < 0 and peak_date is not None:
+                    dd_range = f"{peak_date.strftime('%d.%m.%Y')} - {trough_date.strftime('%d.%m.%Y')}"
+                    st.metric(
+                        "Max. Drawdown", 
+                        f"{max_dd:,.1f} %",
+                        delta=dd_range,
+                        delta_color="off",
+                        help="Größter Verlust vom Allzeithoch während des Simulationszeitraums."
+                    )
+                
                 st.markdown("---")
                 # PDF BUTTON HISTORIE
                 show_pdf_download_button("hist")
@@ -965,7 +1013,7 @@ def render():
             var_col_yr, var_col_ret = st.columns([1, 2])
 
             with var_col_yr:
-                st.markdown('<div role="heading" aria-level="3">**Prognose-Horizont**</div>', unsafe_allow_html=True)
+                st.markdown('<div role="heading" aria-level="3" style="font-weight: bold; margin-bottom: 5px;">Prognose-Horizont</div>', unsafe_allow_html=True)
                 st.slider(
                     "Prognose-Horizont (Jahre)", 
                     min_value=5, max_value=40, value=st.session_state.prognose_jahre, step=1,
@@ -980,7 +1028,7 @@ def render():
                 st.caption(f"Prognose bis Jahr: **{target_year}**")
 
             with var_col_ret:
-                st.markdown('<div role="heading" aria-level="3">**Erwartete Rendite (p.a.) je Titel**</div>', unsafe_allow_html=True)
+                st.markdown('<div role="heading" aria-level="3" style="font-weight: bold; margin-bottom: 5px;">Erwartete Rendite (p.a.) je Titel</div>', unsafe_allow_html=True)
                 current_asset_names = list(st.session_state.prognosis_assumptions_pa.keys())
 
                 if current_asset_names:

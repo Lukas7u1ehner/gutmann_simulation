@@ -1,45 +1,47 @@
 # Portfolio-Templates für Bank Gutmann
-# Simuliert die Übergabe von vordefinierten Portfolios aus einem Beratertool
+# Vordefinierte Szenarien für Demo-Links
 
 PORTFOLIO_TEMPLATES = {
-    "Nachhaltigkeit (ESG)": {
-        "display_name": "Nachhaltigkeit (ESG)",
-        "description": "Fokus auf nachhaltige Investments und ESG-Kriterien",
+    "szenario1": {
+        "display_name": "Szenario 1",
+        "description": "ESG & Clean Energy Mix",
         "assets": [
-            {"ticker": "VER.VI", "name": "Verbund AG (Wasserkraft)", "weight": 30},
-            {"ticker": "ORSTED.CO", "name": "Ørsted (Windenergie)", "weight": 30},
-            {"ticker": "VWS.CO", "name": "Vestas Wind Systems", "weight": 25},
-            {"ticker": "SU.PA", "name": "Schneider Electric (Green Tech)", "weight": 15}
+            {"isin": "IE00BYX2JD69", "name": "iShares MSCI World SRI ETF", "weight": 70},
+            {"isin": "US88160R1014", "name": "Tesla Aktie", "weight": 10},
+            {"isin": "US65339F1012", "name": "NextEra Energy Aktie", "weight": 10},
+            {"isin": "DK0061539921", "name": "Vestas Wind Systems Aktie", "weight": 10},
         ]
     },
-    "Quantitativ (Rule-based)": {
-        "display_name": "Quantitativ (Rule-based)",
-        "description": "Datengetriebene Auswahl nach quantitativen Kriterien",
+    "szenario2": {
+        "display_name": "Szenario 2",
+        "description": "Tech Growth Focus",
         "assets": [
-            {"ticker": "NVDA", "name": "NVIDIA", "weight": 40},
-            {"ticker": "MSFT", "name": "Microsoft", "weight": 30},
-            {"ticker": "ADBE", "name": "Adobe", "weight": 20},
-            {"ticker": "ORCL", "name": "Oracle", "weight": 10}
+            {"isin": "US9229087369", "name": "Vanguard Growth ETF", "weight": 40},
+            {"isin": "US67066G1040", "name": "NVIDIA Aktie", "weight": 15},
+            {"isin": "US0231351067", "name": "Amazon Aktie", "weight": 20},
+            {"isin": "US92532F1003", "name": "Vertex Pharmaceuticals Aktie", "weight": 25},
         ]
     },
-    "Wachstum (Aktienfokus)": {
-        "display_name": "Wachstum (Aktienfokus)",
-        "description": "Wachstumsorientierte Aktien mit hohem Potenzial",
+    "szenario3": {
+        "display_name": "Szenario 3",
+        "description": "Balanced Core",
         "assets": [
-            {"ticker": "PSTG", "name": "Pure Storage", "weight": 30},
-            {"ticker": "QCOM", "name": "Qualcomm", "weight": 30},
-            {"ticker": "MRVL", "name": "Marvell Technology", "weight": 25},
-            {"ticker": "CRM", "name": "Salesforce", "weight": 15}
+            {"isin": "IE00B4L5Y983", "name": "iShares Core MSCI World ETF", "weight": 60},
+            {"isin": "IE00BZ163G84", "name": "Vanguard EUR Corp. Bond ETF", "weight": 40},
         ]
     },
-    "Ausgewogen (Multi-Asset)": {
-        "display_name": "Ausgewogen (Multi-Asset)",
-        "description": "Ausgewogenes Portfolio mit Blue Chips und Dividendentiteln",
+    "szenario4": {
+        "display_name": "Szenario 4",
+        "description": "Diversified Global Mix",
         "assets": [
-            {"ticker": "NESN.SW", "name": "Nestlé", "weight": 30},
-            {"ticker": "V", "name": "Visa", "weight": 30},
-            {"ticker": "JPM", "name": "JPMorgan Chase", "weight": 25},
-            {"ticker": "AAPL", "name": "Apple", "weight": 15}
+            {"isin": "IE00B4L5Y983", "name": "iShares Core MSCI World ETF", "weight": 20},
+            {"isin": "IE00B5BMR087", "name": "iShares Core S&P 500 ETF", "weight": 20},
+            {"isin": "US0378331005", "name": "Apple Aktie", "weight": 10},
+            {"isin": "US5949181045", "name": "Microsoft Aktie", "weight": 10},
+            {"isin": "NL0010273215", "name": "ASML Aktie", "weight": 15},
+            {"isin": "FR0000121014", "name": "LVMH Aktie", "weight": 10},
+            {"isin": "CH0038863350", "name": "Nestlé Aktie", "weight": 10},
+            {"isin": "DE0007164600", "name": "SAP Aktie", "weight": 5},
         ]
     }
 }
@@ -48,42 +50,27 @@ PORTFOLIO_TEMPLATES = {
 def load_portfolio_template(portfolio_type: str, budget: float, savings_rate: float, savings_interval: str = "monatlich"):
     """
     Lädt ein Portfolio-Template und verteilt Budget basierend auf Gewichtungen
-    
-    Args:
-        portfolio_type: Name des Portfolio-Typs (z.B. "Nachhaltigkeit (ESG)")
-        budget: Gesamtbudget für Einmalerläge
-        savings_rate: Gesamtsparrate pro Intervall
-        savings_interval: Sparintervall (monatlich, vierteljährlich, jährlich)
-    
-    Returns:
-        List of asset dictionaries ready for st.session_state.assets
     """
-    # fuzzy matching: check if input string is contained in any key (case insensitive)
+    # Case-insensitive matching
     matched_key = None
-    if portfolio_type in PORTFOLIO_TEMPLATES:
-        matched_key = portfolio_type
-    else:
-        # Versuch: Case-insensitive search
-        norm_type = portfolio_type.lower()
-        for key in PORTFOLIO_TEMPLATES.keys():
-            if norm_type in key.lower() or key.lower() in norm_type:
-                matched_key = key
-                break
+    norm_type = portfolio_type.lower()
+    for key in PORTFOLIO_TEMPLATES.keys():
+        if norm_type == key.lower():
+            matched_key = key
+            break
     
     if not matched_key:
         return []
     
     template = PORTFOLIO_TEMPLATES[matched_key]
-    num_assets = len(template["assets"])
     
     loaded_assets = []
     for asset_template in template["assets"]:
-        # Gewicht aus Template, Fallback zu Gleichverteilung
-        weight = asset_template.get("weight", 100.0 / num_assets)
+        weight = asset_template["weight"]
         
         loaded_assets.append({
             "Name": asset_template["name"],
-            "ISIN / Ticker": asset_template["ticker"],
+            "ISIN / Ticker": asset_template["isin"],
             "Gewichtung (%)": weight,
             "Einmalerlag (€)": (budget * weight) / 100,
             "Sparbetrag (€)": (savings_rate * weight) / 100,
@@ -95,6 +82,9 @@ def load_portfolio_template(portfolio_type: str, budget: float, savings_rate: fl
 
 def get_portfolio_display_name(portfolio_type: str) -> str:
     """Gibt den Anzeigenamen eines Portfolio-Typs zurück"""
-    if portfolio_type in PORTFOLIO_TEMPLATES:
-        return PORTFOLIO_TEMPLATES[portfolio_type]["display_name"]
-    return portfolio_type
+    # Überprüfen ob es ein bekanntes Szenario ist, sonst leeren String (da wir keine Typen mehr anzeigen wollen)
+    norm_type = portfolio_type.lower()
+    for key in PORTFOLIO_TEMPLATES.keys():
+        if norm_type == key.lower():
+            return PORTFOLIO_TEMPLATES[key]["display_name"]
+    return ""

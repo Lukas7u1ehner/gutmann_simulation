@@ -92,6 +92,116 @@ MARKET_PHASES = [
     }
 ]
 
+# --- FARBPALETTE FÜR PIE CHART (10 deutlich unterscheidbare Farben) ---
+PIE_CHART_COLORS = [
+    "#B3D463",  # Grün (Gutmann Accent)
+    "#3498DB",  # Dunkelblau
+    "#FF6B6B",  # Koralle/Rot
+    "#F39C12",  # Orange
+    "#9B59B6",  # Violett
+    "#1ABC9C",  # Türkis
+    "#E91E63",  # Pink/Rosa
+    "#FFC107",  # Gelb
+    "#00BCD4",  # Cyan/Hellblau
+    "#8D6E63",  # Braun/Taupe
+]
+
+
+def create_weight_pie_chart(assets: list[dict]):
+    """
+    Erstellt ein Tortendiagramm zur Visualisierung der Portfolio-Gewichtungen.
+    Zeigt einen transparenten "Rest"-Bereich wenn Gesamtgewichtung < 100%.
+    
+    Args:
+        assets: Liste der Assets mit 'Name' und 'Gewichtung (%)' Keys
+    
+    Returns:
+        Plotly Figure mit dem Pie Chart
+    """
+    # Daten extrahieren
+    labels = []
+    values = []
+    
+    for asset in assets:
+        name = asset.get("Name", "Unbekannt")
+        weight = asset.get("Gewichtung (%)", 0.0)
+        if weight > 0:  # Nur Assets mit Gewichtung > 0 anzeigen
+            labels.append(name)
+            values.append(weight)
+    
+    # Falls keine Daten vorhanden, leeres Chart zurückgeben
+    if not labels:
+        fig = go.Figure()
+        fig.add_annotation(
+            text="Keine Gewichtungen vorhanden",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5,
+            showarrow=False,
+            font=dict(size=14, color=GUTMANN_LIGHT_TEXT)
+        )
+        fig.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            height=300
+        )
+        return fig
+    
+    # Farben zuweisen (zyklisch durch Palette)
+    colors = [PIE_CHART_COLORS[i % len(PIE_CHART_COLORS)] for i in range(len(labels))]
+    
+    # Berechne Gesamtgewichtung und füge "Rest" hinzu wenn < 100%
+    total_weight = sum(values)
+    has_remaining = total_weight < 100
+    
+    if has_remaining:
+        remaining = 100 - total_weight
+        labels.append("")  # Leerer Label für Rest
+        values.append(remaining)
+        colors.append("rgba(100, 100, 100, 0.2)")  # Transparentes Grau für Rest
+    
+    # Custom Text-Array: Nur für echte Assets, nicht für Rest-Segment
+    num_real_assets = len(labels) - 1 if has_remaining else len(labels)
+    custom_text = [f"{labels[i]}<br>{values[i]:.1f}%" for i in range(num_real_assets)]
+    if has_remaining:
+        custom_text.append("")  # Kein Text für Rest-Segment
+    
+    # Pie Chart erstellen
+    fig = go.Figure(data=[go.Pie(
+        labels=labels,
+        values=values,
+        hole=0.4,  # Donut-Style für modernes Aussehen
+        marker=dict(
+            colors=colors,
+            line=dict(color=GUTMANN_DARK_GREEN, width=1)  # Dünnere Linie
+        ),
+        textposition='outside',
+        text=custom_text,
+        textinfo='text',  # Verwende custom text statt automatisch
+        textfont=dict(size=11, color=GUTMANN_LIGHT_TEXT),
+        hoverinfo='label+percent' if not has_remaining else 'skip',
+        hovertemplate='<b>%{label}</b><br>Gewichtung: %{percent}<br>(%{value:.1f}%)<extra></extra>',
+        pull=[0] * len(labels)  # Kein Explode-Effekt für gleichmäßige Abstände
+    )])
+    
+    # Layout anpassen
+    fig.update_layout(
+        showlegend=False,  # Labels sind bereits im Chart
+        paper_bgcolor="rgba(0,0,0,0)",  # Transparenter Hintergrund
+        plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=20, r=20, t=30, b=20),
+        height=350,
+        annotations=[
+            dict(
+                text="<b>Gewichtung</b>",
+                x=0.5, y=0.5,
+                font=dict(size=14, color=GUTMANN_LIGHT_TEXT),
+                showarrow=False
+            )
+        ]
+    )
+    
+    return fig
+
 
 def create_simulation_chart(
     df_history: pd.DataFrame = None, 

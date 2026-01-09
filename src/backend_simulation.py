@@ -61,10 +61,14 @@ def load_data(isin: str, start_date: date, end_date: date) -> pd.DataFrame | Non
             continue
 
     # 3. Wenn nicht im Cache, von yfinance laden
-    print(f"Lade Daten für {isin} von yfinance ({start_date} bis {end_date})...")
+    # Ticker Lookup für yfinance (da yfinance meist Ticker braucht)
+    from .catalog import ISIN_TO_TICKER
+    ticker_to_load = ISIN_TO_TICKER.get(isin, isin) # Fallback auf ISIN selbst, falls kein Mapping
+    
+    print(f"Lade Daten für {isin} (Ticker: {ticker_to_load}) von yfinance ({start_date} bis {end_date})...")
 
     try:
-        data = yf.download(isin, start=start_date, end=end_date)
+        data = yf.download(ticker_to_load, start=start_date, end=end_date)
 
         if data.empty:
             print(f"Keine Daten gefunden für Ticker: {isin}")

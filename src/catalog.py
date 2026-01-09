@@ -4,127 +4,142 @@
 KATALOG = {
     "Bitte wählen...": "",
     
-    # --- US Tech (Beispiele) ---
+    # --- US Aktien (Tech & Blue Chip) ---
     "Apple Aktie": "US0378331005",
     "Microsoft Aktie": "US5949181045",
-    "Amazon Aktie": "US0231351067",
-    "Alphabet Aktie (Google A)": "US02079K3059",
     "NVIDIA Aktie": "US67066G1040",
+    "Amazon Aktie": "US0231351067",
+    "Alphabet A Aktie": "US02079K3059",
+    "Meta Platforms Aktie": "US30303M1027",
     "Tesla Aktie": "US88160R1014",
-    "Meta Platforms Aktie (Facebook)": "US30303M1027",
-    "Netflix Aktie": "US64110L1061",
-    "Adobe Aktie": "US00724F1012",
-    "Salesforce Aktie": "US79466L3024",
-    
-    # --- US Blue Chips (Beispiele) ---
-    "Berkshire Hathaway B": "US0846707026",
-    "Johnson & Johnson Aktie": "US4781601046",
-    "Procter & Gamble Aktie": "US7427181091",
-    "Coca-Cola Aktie": "US1912161007",
-    "PepsiCo Aktie": "US7134481081",
-    "McDonald's Aktie": "US5801351017",
-    "Walmart Aktie": "US9311421039",
+    "Broadcom Aktie": "US11135F1012",
+    "Berkshire Hathaway B Aktie": "US0846707026",
+    "Eli Lilly Aktie": "US5324571083",
     "JPMorgan Chase Aktie": "US46625H1005",
     "Visa Aktie": "US92826C8394",
     "Mastercard Aktie": "US57636Q1040",
+    "Walmart Aktie": "US9311421039",
+    "Exxon Mobil Aktie": "US30231G1022",
+    "Johnson & Johnson Aktie": "US4781601046",
+    "Procter & Gamble Aktie": "US7427181091",
+    "Costco Aktie": "US22160K1051",
+    "PepsiCo Aktie": "US7134481081",
+    "Netflix Aktie": "US64110L1061",
+    "Adobe Aktie": "US00724F1012",
+    "Salesforce Aktie": "US79466L3024",
+    "Vertex Pharmaceuticals Aktie": "US92532F1003",
+    "NextEra Energy Aktie": "US65339F1012",
     
-    # --- ETFs (Beispiele) ---
-    "S&P 500 ETF (iShares)": "IE00B5BMR087",
-    "MSCI World ETF (iShares)": "IE00B4L5Y983",
-    "MSCI Emerging Markets ETF (iShares)": "IE00B4L5Y983",
-    "NASDAQ 100 ETF (iShares)": "IE00B53SZB19",
-    "STOXX Europe 600 ETF (iShares)": "DE0002635307",
-
-    # --- Europäische Aktien (Beispiele) ---
-    "LVMH Aktie": "FR0000121014",
+    # --- Europäische Aktien ---
     "ASML Aktie": "NL0010273215",
-    "Novo Nordisk Aktie": "DK0060534915",
-    "Nestlé Aktie": "CH0038863350",
-    "Roche Aktie": "CH0012032048",
+    "LVMH Aktie": "FR0000121014",
+    "Novo Nordisk B Aktie": "DK0060534915",
     "SAP Aktie": "DE0007164600",
+    "Nestlé Aktie": "CH0038863350",
+    "Roche Holding Aktie": "CH0012032048",
+    "Shell Aktie": "GB00BP6MXD84",
+    "AstraZeneca Aktie": "GB0009895292",
     "Siemens Aktie": "DE0007236101",
+    "L'Oréal Aktie": "FR0000120321",
     "Allianz Aktie": "DE0008404005",
-    "Volkswagen Aktie": "DE0007664039",
+    "Schneider Electric Aktie": "FR0000121972",
+    "Airbus Aktie": "NL0000235190",
+    "TotalEnergies Aktie": "FR0000120271",
+    "Iberdrola Aktie": "ES0144580Y14",
+    "Vestas Wind Systems Aktie": "DK0061539921",
     "Mercedes-Benz Aktie": "DE0007100000",
     "BMW Aktie": "DE0005190003",
+    "Volkswagen Vz Aktie": "DE0007664039",
+    "Infineon Aktie": "DE0006231004",
     
-    # --- ESG-Beispiele (Fokus auf Erneuerbare/Nachhaltigkeit) ---
-    "Verbund AG (Österreich)": "AT0000746409",
-    "Ørsted (Dänemark)": "DK0060094928",
-    "Vestas Wind Systems (Dänemark)": "DK0061539921",
-    "Infineon Technologies (Deutschland)": "DE0006231004",
-    "Schneider Electric (Frankreich)": "FR0000121972",
-    "Erste Group Bank (Österreich)": "AT0000652011", # Gilt oft als ESG-konform
-    
-    # --- Österreichische Aktien (ATX Beispiele) ---
-    "OMV Aktie": "AT0000743059",
-    "voestalpine Aktie": "AT0000937503",
-    "Raiffeisen Bank International Aktie": "AT0000606306",
-    "Wienerberger Aktie": "AT0000831706",
-    "ANDRITZ Aktie": "AT0000730007",
-    "BAWAG Group Aktie": "AT0000BAWAG2",
-    "Österreichische Post Aktie": "AT0000APOST4",
-    "Vienna Insurance Group Aktie": "AT00009VIG3",
+    # --- ETFs & Fonds ---
+    "iShares Core MSCI World ETF": "IE00B4L5Y983",
+    "Vanguard FTSE All-World ETF": "IE00BK5BQT80",
+    "iShares Core S&P 500 ETF": "IE00B5BMR087",
+    "Vanguard S&P 500 ETF": "IE00B3XXRP09",
+    "iShares NASDAQ 100 ETF": "IE00B53SZB19",
+    "Invesco EQQQ Nasdaq-100 ETF": "IE0032077012",
+    "iShares Core MSCI EM IMI ETF": "IE00BKM4GZ66",
+    "iShares STOXX Europe 600 ETF": "DE0002635307",
+    "Xtrackers MSCI World ETF": "IE00BJ0KDQ92",
+    "Vanguard FTSE North America ETF": "IE00BK5BQW10",
+    "iShares MSCI World SRI ETF": "IE00BYX2JD69",
+    "iShares Global Clean Energy ETF": "IE00B1XNHC34",
+    "Vanguard Growth ETF": "US9229087369",
+    "Vanguard EUR Corp. Bond ETF": "IE00BZ163G84",
+    "Xtrackers DAX ETF": "LU0274211480",
+    "Amundi MSCI World Fonds": "LU1681043599",
+    "DWS Top Dividende Fonds": "DE0009848119", 
+    "Flossbach von Storch Multiple Opportunities Fonds": "LU0323578657", 
+}
 
-    # --- ETFs (Ticker für XETRA/Frankfurt meist mit .DE) ---
-    "S&P 500 ETF (iShares)": "SXR8.DE",        # ISIN: IE00B5BMR087
-    "MSCI World ETF (iShares)": "EUNL.DE",     # ISIN: IE00B4L5Y983
-    "MSCI Emerging Markets ETF": "IS3N.DE",    # ISIN: IE00BKM4GZ66
-    "NASDAQ 100 ETF (iShares)": "SXRV.DE",     # ISIN: IE00B53SZB19
-    "STOXX Europe 600 ETF": "EXSA.DE",         # ISIN: DE0002635307
+# --- INTERNES MAPPING: ISIN -> TICKER (für yfinance) ---
+ISIN_TO_TICKER = {
+    # US Tech & Blue Chip
+    "US0378331005": "AAPL",   # Apple
+    "US5949181045": "MSFT",   # Microsoft
+    "US67066G1040": "NVDA",   # Nvidia
+    "US0231351067": "AMZN",   # Amazon
+    "US02079K3059": "GOOGL",  # Alphabet A
+    "US30303M1027": "META",   # Meta
+    "US88160R1014": "TSLA",   # Tesla
+    "US11135F1012": "AVGO",   # Broadcom
+    "US0846707026": "BRK-B",  # Berkshire B
+    "US5324571083": "LLY",    # Eli Lilly
+    "US46625H1005": "JPM",    # JPMorgan
+    "US92826C8394": "V",      # Visa
+    "US57636Q1040": "MA",     # Mastercard
+    "US9311421039": "WMT",    # Walmart
+    "US30231G1022": "XOM",    # Exxon Mobil
+    "US4781601046": "JNJ",    # Johnson & Johnson
+    "US7427181091": "PG",     # Procter & Gamble
+    "US22160K1051": "COST",   # Costco
+    "US7134481081": "PEP",    # PepsiCo
+    "US64110L1061": "NFLX",   # Netflix
+    "US00724F1012": "ADBE",   # Adobe
+    "US79466L3024": "CRM",    # Salesforce
+    "US92532F1003": "VRTX",   # Vertex
+    "US65339F1012": "NEE",    # NextEra
+    
+    # Europäische Aktien (oft via Xetra .DE oder Heimatbörse)
+    "NL0010273215": "ASML.AS",   # ASML
+    "FR0000121014": "MC.PA",     # LVMH
+    "DK0060534915": "NOVO-B.CO", # Novo Nordisk
+    "DE0007164600": "SAP.DE",    # SAP
+    "CH0038863350": "NESN.SW",   # Nestlé
+    "CH0012032048": "ROG.SW",    # Roche
+    "GB00BP6MXD84": "SHEL.L",    # Shell
+    "GB0009895292": "AZN.L",     # AstraZeneca
+    "DE0007236101": "SIE.DE",    # Siemens
+    "FR0000120321": "OR.PA",     # L'Oréal
+    "DE0008404005": "ALV.DE",    # Allianz
+    "FR0000121972": "SU.PA",     # Schneider Electric
+    "NL0000235190": "AIR.PA",    # Airbus
+    "FR0000120271": "TTE.PA",    # TotalEnergies
+    "ES0144580Y14": "IBE.MC",    # Iberdrola
+    "DK0061539921": "VWS.CO",    # Vestas
+    "DE0007100000": "MBG.DE",    # Mercedes-Benz
+    "DE0005190003": "BMW.DE",    # BMW
+    "DE0007664039": "VOW3.DE",   # VW Vz
+    "DE0006231004": "IFX.DE",    # Infineon
 
-    # --- US Tech (Original US Ticker) ---
-    "Apple Aktie": "AAPL",
-    "Microsoft Aktie": "MSFT",
-    "Amazon Aktie": "AMZN",
-    "Alphabet Aktie (Google A)": "GOOGL",
-    "NVIDIA Aktie": "NVDA",
-    "Tesla Aktie": "TSLA",
-    "Meta Platforms (Facebook)": "META",
-    "Netflix Aktie": "NFLX",
-    "Adobe Aktie": "ADBE",
-    "Salesforce Aktie": "CRM",
-    
-    # --- US Blue Chips ---
-    "Berkshire Hathaway B": "BRK-B",
-    "Johnson & Johnson": "JNJ",
-    "Procter & Gamble": "PG",
-    "Coca-Cola": "KO",
-    "PepsiCo": "PEP",
-    "McDonald's": "MCD",
-    "Walmart": "WMT",
-    "JPMorgan Chase": "JPM",
-    "Visa": "V",
-    "Mastercard": "MA",
-
-    # --- Europäische Aktien (Ticker oft mit .DE, .PA, .AS) ---
-    "LVMH (Frankreich)": "MC.PA",
-    "ASML (Niederlande)": "ASML.AS",
-    "Novo Nordisk (Dänemark)": "NOVO-B.CO",
-    "Nestlé (Schweiz)": "NESN.SW",
-    "Roche (Schweiz)": "ROG.SW",
-    "SAP (Deutschland)": "SAP.DE",
-    "Siemens (Deutschland)": "SIE.DE",
-    "Allianz (Deutschland)": "ALV.DE",
-    "Volkswagen Vz. (Deutschland)": "VOW3.DE",
-    "Mercedes-Benz (Deutschland)": "MBG.DE",
-    "BMW (Deutschland)": "BMW.DE",
-    
-    # --- ESG & Erneuerbare ---
-    "Verbund AG (Österreich)": "VER.VI",
-    "Ørsted (Dänemark)": "ORSTED.CO",
-    "Vestas Wind Systems": "VWS.CO",
-    "Infineon Technologies": "IFX.DE",
-    "Schneider Electric": "SU.PA",
-    "Erste Group Bank": "EBS.VI",
-    
-    # --- Österreich (ATX Ticker meist .VI für Vienna) ---
-    "OMV AG": "OMV.VI",
-    "voestalpine AG": "VOE.VI",
-    "Raiffeisen Bank Int.": "RBI.VI",
-    "Wienerberger AG": "WIE.VI",
-    "ANDRITZ AG": "ANDR.VI",
-    "BAWAG Group": "BG.VI",
-    "Österreichische Post": "POST.VI",
-    "Vienna Insurance Group": "VIG.VI",
+    # ETFs & Fonds (Mapping auf liquide Börsenplätze)
+    "IE00B4L5Y983": "EUNL.DE",   # Core MSCI World
+    "IE00BK5BQT80": "VWCE.DE",   # FTSE All-World
+    "IE00B5BMR087": "SXR8.DE",   # S&P 500 Acc
+    "IE00B3XXRP09": "VUSA.DE",   # S&P 500 Dist
+    "IE00B53SZB19": "SXRV.DE",   # Nasdaq 100
+    "IE0032077012": "EQQQ.DE",   # EQQQ Nasdaq 100
+    "IE00BKM4GZ66": "IS3N.DE",   # MSCI EM IMI
+    "DE0002635307": "EXSA.DE",   # Stoxx 600
+    "IE00BJ0KDQ92": "XDWD.DE",   # Xtrackers MSCI World
+    "IE00BK5BQW10": "VNRA.DE",   # FTSE North America
+    "IE00BYX2JD69": "2B7K.DE",   # MSCI World SRI
+    "IE00B1XNHC34": "IQQH.DE",   # Clean Energy
+    "US9229087369": "VUG",       # Vanguard Growth (US-Ticker)
+    "IE00BZ163G84": "VECP.DE",   # Corp Bond
+    "LU0274211480": "DBX1.DE",   # DAX
+    "LU1681043599": "CW8.PA",    # Amundi MSCI World (Beispiel für Fonds-Proxy, oft ETF)
+    "DE0009848119": "0P00000S6R.F", # DWS Top Dividende (Symbol via Frankfurt)
+    "LU0323578657": "0P00000XBT.F", # Flossbach Multiple Opp. (Symbol via Frankfurt)
 }

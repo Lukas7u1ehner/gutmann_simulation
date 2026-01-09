@@ -140,3 +140,42 @@ def run_portfolio_simulation(
     final_portfolio["Portfolio (real)"] = final_portfolio["Portfolio (nominal)"] / final_inflation_series
 
     return final_portfolio, historical_returns_pa, individual_final_values
+
+
+def calculate_max_drawdown(df: pd.DataFrame, column: str = "Portfolio (nominal)"):
+    """
+    Berechnet den Maximum Drawdown (größter Verlust vom Hoch) und dessen Zeitraum.
+    
+    Args:
+        df: DataFrame mit Portfolio-Daten (Index = Datum)
+        column: Spaltenname für die Berechnung
+    
+    Returns:
+        tuple: (drawdown_pct, peak_date, trough_date) oder (0, None, None) bei Fehler
+    """
+    if df is None or df.empty or column not in df.columns:
+        return 0.0, None, None
+    
+    try:
+        # Kumulatives Maximum (bisheriges Allzeithoch)
+        cummax = df[column].cummax()
+        
+        # Drawdown als Prozent vom Hoch
+        drawdown = (df[column] - cummax) / cummax
+        
+        # Maximaler Drawdown (negativster Wert)
+        max_dd = drawdown.min()
+        
+        if max_dd >= 0:
+            return 0.0, None, None  # Kein Drawdown vorhanden
+        
+        # Tiefpunkt-Datum
+        trough_date = drawdown.idxmin()
+        
+        # Hochpunkt-Datum (letztes Hoch vor dem Tiefpunkt)
+        peak_date = df[column][:trough_date].idxmax()
+        
+        return max_dd * 100, peak_date, trough_date
+        
+    except Exception:
+        return 0.0, None, None

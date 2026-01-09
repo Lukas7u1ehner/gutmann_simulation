@@ -16,12 +16,12 @@ def generate_checkout_csv(assets, handover_data, inputs):
         f"Berater;{handover_data.get('advisor','-')}",
         f"Budget;{inputs.get('budget',0)}",
         f"Einmalerlag;{inputs.get('einmalerlag',0)}",
-        f"Sparrate;{inputs.get('sparrate',0)}",
+        f"Laufender Betrag;{inputs.get('sparrate',0)}",
         "" # Leerzeile
     ]
     
     # 2. Positionen
-    cols = ["Name", "ISIN", "Gewichtung (%)", "Einmalerlag (EUR)", "Sparbetrag (EUR)", "Intervall"]
+    cols = ["Name", "ISIN", "Gewichtung (%)", "Einmalerlag (EUR)", "Laufender Betrag (EUR)", "Intervall"]
     data_rows = [";".join(cols)]
     
     for a in assets:

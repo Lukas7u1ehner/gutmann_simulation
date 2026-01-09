@@ -61,35 +61,37 @@ def render():
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # 4. System Wartung (Eingeklappt)
-    with st.expander("🛠️ System-Wartung (Daten-Cache)"):
-        st.write("Laden Sie hier alle Marktdaten für den Katalog lokal herunter, um die App offline-fähig und robuster zu machen.")
-        
-        if st.button("Gesamten Katalog vorladen (ab 2000)", use_container_width=True):
-            from .cache_manager import preload_all_data
+    # 4. System Wartung (Nur sichtbar mit ?admin=1 in der URL)
+    if st.query_params.get("admin") == "1":
+        with st.expander("🛠️ System-Wartung (Daten-Cache)"):
+            st.write("Laden Sie hier alle Marktdaten für den Katalog lokal herunter, um die App offline-fähig und robuster zu machen.")
             
-            progress_bar = st.progress(0)
-            status_text = st.empty()
-            
-            status_text.write("⏳ Starte Pre-loading... Dies kann einige Minuten dauern.")
-            
-            from .catalog import KATALOG
-            from . import backend_simulation
-            from datetime import date
-            import time
-            
-            tickers = [v for k, v in KATALOG.items() if v]
-            total = len(tickers)
-            
-            for i, ticker in enumerate(tickers, 1):
-                status_text.write(f"Verarbeite {i}/{total}: **{ticker}**")
-                try:
-                    backend_simulation.load_data(ticker, date(2000, 1, 1), date.today())
-                except Exception as e:
-                    st.error(f"Fehler bei {ticker}: {e}")
+            if st.button("Gesamten Katalog vorladen (ab 2000)", use_container_width=True):
+                from .cache_manager import preload_all_data
                 
-                progress_bar.progress(i / total)
-                time.sleep(0.05) 
+                progress_bar = st.progress(0)
+                status_text = st.empty()
                 
-            status_text.write("✅ **Pre-loading abgeschlossen!** Alle Daten sind nun lokal gespeichert.")
-            st.balloons()
+                status_text.write("⏳ Starte Pre-loading... Dies kann einige Minuten dauern.")
+                
+                from .catalog import KATALOG
+                from . import backend_simulation
+                from datetime import date
+                import time
+                
+                tickers = [v for k, v in KATALOG.items() if v]
+                total = len(tickers)
+                
+                for i, ticker in enumerate(tickers, 1):
+                    status_text.write(f"Verarbeite {i}/{total}: **{ticker}**")
+                    try:
+                        backend_simulation.load_data(ticker, date(2000, 1, 1), date.today())
+                    except Exception as e:
+                        st.error(f"Fehler bei {ticker}: {e}")
+                    
+                    progress_bar.progress(i / total)
+                    time.sleep(0.05) 
+                    
+                status_text.write("✅ **Pre-loading abgeschlossen!** Alle Daten sind nun lokal gespeichert.")
+                st.balloons()
+
