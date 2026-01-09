@@ -9,11 +9,9 @@ from .style import (
 
 def render():
     """
-    Rendert den Inhalt des 'Startseite' Tabs als modernes Advisor Dashboard V3.
+    Rendert den Inhalt des 'Startseite' Tabs als modernes Advisor Dashboard.
     """
-    # 1. Header Area
-    # Spalten: [Titel/Status - Logo - Leer]
-    # 1. Header Area (Logo Only, Centered)
+    # Header Area (Logo Only, Centered)
     st.markdown(f"""
     <div style="display: flex; justify-content: center; align-items: center; margin-top: 20px; margin-bottom: 30px;" role="banner" aria-label="Header mit Firmenlogo">
         <img src="{GUTMANN_LOGO_URL}" alt="Bank Gutmann Logo" style="width: 400px; max-width: 90%; height: auto;">
@@ -23,7 +21,7 @@ def render():
     def go_to_simulation():
          st.session_state.main_nav = "Simulation"
     
-    # Große Action Card
+    # Action Card
     st.markdown(f"""
     <div style="background-color: {GUTMANN_SECONDARY_DARK}; padding: 20px; border-radius: 8px; border-left: 6px solid {GUTMANN_ACCENT_GREEN}; margin-bottom: 20px;" role="region" aria-label="Neues Kundengespräch">
         <h3 style="color: {GUTMANN_ACCENT_GREEN}; margin-top:0;">Neues Kundengespräch</h3>
@@ -31,14 +29,14 @@ def render():
     </div>
     """, unsafe_allow_html=True)
     
-    # Button nur im ersten Drittel der Breite unter der Card (wirkt "aufgeräumter")
+    # Button-Layout
     c_btn1, c_btn2, c_btn3 = st.columns([1, 1, 1])
     with c_btn1:
         st.button("Simulation starten", key="btn_start_sim", use_container_width=True, type="primary", on_click=go_to_simulation)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # 3. Advisor Talking Points (Markt-Kontext)
+    # Advisor Talking Points
     st.subheader("Talking Points: Markt & Strategie")
     
     tp_col1, tp_col2 = st.columns(2)
@@ -61,7 +59,7 @@ def render():
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # 4. System Wartung (Nur sichtbar mit ?admin=1 in der URL)
+    # System Wartung (Nur sichtbar mit ?admin=1 in der URL)
     if st.query_params.get("admin") == "1":
         with st.expander("🛠️ System-Wartung (Daten-Cache)"):
             st.write("Laden Sie hier alle Marktdaten für den Katalog lokal herunter, um die App offline-fähig und robuster zu machen.")

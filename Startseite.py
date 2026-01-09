@@ -2,18 +2,18 @@ import streamlit as st
 from datetime import date
 import sys, os
 
-# --- PERMANENTER SSL-FIX (vor allen anderen Imports) ---
+#  PERMANENTER SSL-FIX (vor allen anderen Imports) 
 try:
     import certifi
     os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
     os.environ['SSL_CERT_FILE'] = certifi.where()
 except ImportError:
     pass
-# ------------------------------------------------------
+# 
 
 st.set_page_config(page_title="Simulation | Gutmann", page_icon="📈", layout="wide")
 
-# --- CHECKOUT RESET LOGIC (Fix für StreamlitAPIException) ---
+#  CHECKOUT RESET LOGIC 
 if st.session_state.get("pending_reset"):
     # Widget-Keys sicher löschen (sodass sie beim nächsten Render neu initialisiert werden)
     keys_to_reset = ["editable_budget", "editable_einmalerlag", "editable_sparrate", "main_nav"]
@@ -21,18 +21,17 @@ if st.session_state.get("pending_reset"):
         if key in st.session_state:
             del st.session_state[key]
             
-    # Optional: Handover-Daten resetten, damit Simulation neu lädt
+    # Handover-Daten resetten, damit Simulation neu lädt
     if "handover_data" in st.session_state:
         del st.session_state["handover_data"]
         
-    # FIX: Auch die URL-Parameter löschen, damit bei Rerun nicht wieder die alten Daten geladen werden
+    # URL-Parameter löschen, damit bei Rerun nicht wieder die alten Daten geladen werden
     st.query_params.clear()
         
     st.session_state["pending_reset"] = False
     st.rerun() # Rerun um sicherzustellen, dass der State sauber ist
 
-# --- URL-PARAMETER-HANDLING (Tool A -> Tool B Simulation) ---
-# Für FH-Projekt: Simuliert die Übergabe von Beraterdaten aus Tool A
+#  URL-PARAMETER-HANDLING (Tool A -> Tool B Simulation) 
 try:
     query_params = st.query_params
     
@@ -40,14 +39,12 @@ try:
     advisor_name = query_params.get("advisorName", "MSc Daniela Delipetar")
     client_name = query_params.get("clientName", "Tamara Wolna")  
     budget_str = query_params.get("budget", "0")
-    einmalerlag_str = query_params.get("einmalerlag", "0")  # NEU: Gesamt-Einmalerlag für Portfolio
-    portfolio_type = query_params.get("portfolioType", None)  # None = kein Auto-Loading
-    # Support both snake_case and camelCase for savings_rate
+    einmalerlag_str = query_params.get("einmalerlag", "0") 
+    portfolio_type = query_params.get("portfolioType", None)  
     savings_rate_str = query_params.get("savings_rate", query_params.get("savingsRate", "0"))
     savings_interval = query_params.get("savingsInterval", "monatlich")
     
-    # NEU: Custom Gewichtungen parsen (optional)
-    # Format: weight_TICKER=percentage (z.B. weight_LLY=40&weight_GOOGL=35)
+    # Custom Gewichtungen parsen 
     custom_weights = {}
     for key in query_params.keys():
         if key.startswith("weight_"):
@@ -75,12 +72,12 @@ try:
             "advisor": advisor_name,
             "client": client_name,
             "budget": budget,
-            "einmalerlag": einmalerlag,  # NEU: Gesamteinmalerlag
+            "einmalerlag": einmalerlag,
             "portfolio_type": portfolio_type,
             "savings_rate": savings_rate,
             "savings_interval": savings_interval,
-            "custom_weights": custom_weights,  # NEU: Custom Gewichtungen aus URL
-            "preloaded": False  # Flag für einmaliges Auto-Loading
+            "custom_weights": custom_weights,
+            "preloaded": False
         }
 except Exception as e:
     # Fallback bei Fehler: Dummy-Daten setzen
@@ -88,15 +85,14 @@ except Exception as e:
         st.session_state.handover_data = {
             "advisor": "MsC Daniel Delipetar",
             "client": "Tamara Wolna",
-            "budget": 0.0,
-            "einmalerlag": 0.0,
+            "budget": 500000.0,
+            "einmalerlag": 300000.0,
             "portfolio_type": None,
-            "savings_rate": 0.0,
+            "savings_rate": 2000.0,
             "savings_interval": "monatlich",
             "custom_weights": {},
             "preloaded": False
         }
-# ------------------------------------------------------
 
 try:
     from src.style import (
@@ -106,10 +102,8 @@ try:
         GUTMANN_SECONDARY_DARK,
         GUTMANN_ACCENT_GREEN
     )
-    # Neue modulare Imports mit Tab_ Prefix
     from src import Tab_Startseite 
     from src import Tab_Simulation
-    # Marktanalyse Import entfernt, da integriert
 
     apply_gutmann_style()
 
@@ -119,7 +113,7 @@ except ImportError as e:
     )
     st.stop()
 
-# --- CSS ANPASSUNGEN (Global) ---
+#  CSS ANPASSUNGEN (Global) 
 st.markdown(f"""
 <style>
 /* 1. Slider Style */
@@ -183,7 +177,7 @@ div[data-testid="stRadio"] label p {{
 </style>
 """, unsafe_allow_html=True)
 
-# --- ACCESSIBILITY: JavaScript für Tab-Navigation ---
+#  ACCESSIBILITY: JavaScript für Tab-Navigation 
 import streamlit.components.v1 as components
 components.html("""
 <script>
@@ -219,7 +213,7 @@ if (window.frameElement) {
 """, height=0)
 
 
-# --- SESSION STATE INITIALISIERUNG ---
+#  SESSION STATE INITIALISIERUNG 
 if "main_nav" not in st.session_state:
     st.session_state.main_nav = "Startseite"
 if "sim_sub_nav_state" not in st.session_state:
@@ -264,12 +258,11 @@ if "prognosis_assumptions_pa" not in st.session_state:
     st.session_state.prognosis_assumptions_pa = {}
 
 
-# --- HAUPT-NAVIGATION ---
-# Feedback: Marktanalyse Tab entfernt, da nun integriert
+#  HAUPT-NAVIGATION 
 st.radio("Hauptnavigation", options=["Startseite", "Simulation"], key="main_nav", horizontal=True, label_visibility="collapsed", help="Navigation: Wechseln Sie zwischen Startseite und Simulation")
 
 
-# --- VIEW LOGIK (ROUTING) ---
+#  VIEW LOGIK (ROUTING) 
 if st.session_state.main_nav == "Startseite":
     Tab_Startseite.render()
 

@@ -45,9 +45,6 @@ def reset_simulation_state():
     st.session_state.assets = []
     
     # 2. Inputs zurücksetzen (DEFERRED)
-    # WICHTIG: Wir können hier nicht 'editable_budget' etc. setzen, da diese an Widgets gebunden sind
-    # und das Skript noch läuft ("StreamlitAPIException").
-    # Stattdessen setzen wir ein Flag, das beim nächsten Laden von Startseite.py den Reset durchführt.
     st.session_state["pending_reset"] = True
     
     # 3. Berechnete Daten löschen
@@ -58,8 +55,6 @@ def reset_simulation_state():
     st.session_state.asset_final_values = {}
     
     # 4. Navigation zurück zur Startseite (DEFERRED via Startseite.py logic)
-    # st.session_state.main_nav = "Startseite"  <-- verursacht API Exception
-    # Sub-Nav resetten (optional, aber sauber)
     st.session_state.sim_sub_nav_state = "Historische Simulation"
     
     # 5. URL-Parameter bereinigen (direkt beim Interaktions-Event)
@@ -120,10 +115,9 @@ def render_finish_button(key_suffix):
             components.html(f"<html><body>{js}</body></html>", height=0)
         
         # 3. User Feedback & Delay
-        st.success("Daten wurden an übermittelt")
+        st.success("Daten wurden übermittelt")
         
-        # Kurzer Sleep nötig, damit der Browser den Download initiiert,
-        # bevor der Streamlit Rerun (Reset) alles killt.
+        # Kurzer Sleep nötig, damit der Browser den Download initiiert, bevor der Streamlit Rerun (Reset) alles killt.
         time.sleep(2.5) 
         
         # 4. Reset & Redirect

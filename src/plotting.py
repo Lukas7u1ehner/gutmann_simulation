@@ -23,7 +23,7 @@ PROGNOSE_BEST_LINE_COLOR = "rgba(0, 200, 0, 1.0)"
 PROGNOSE_WORST_LINE_COLOR = "rgba(200, 0, 0, 1.0)"
 PROGNOSE_EINZAHLUNG_COLOR = "#707070"
 
-# --- MARKT-PHASEN DATEN (Erweitert bis 1980) ---
+#  MARKT-PHASEN DATEN (Erweitert bis 1980) 
 MARKET_PHASES = [
     {
         "label": "Dotcom-Blase",
@@ -60,7 +60,7 @@ MARKET_PHASES = [
         "desc": "Hohe Inflation, Ukraine-Krieg und steigende Zinsen. Rückgang ca. 25%.",
         "color": "rgba(255, 0, 0, 0.1)"
     },
-    # --- NEUE HISTORISCHE PHASEN (1980-2000) ---
+    #  NEUE HISTORISCHE PHASEN (1980-2000) 
     {
         "label": "Russlandkrise & LTCM",
         "start": "1998-07-17",
@@ -82,17 +82,17 @@ MARKET_PHASES = [
         "desc": "Größter Tagesverlust der Geschichte (-22,6% am 19. Okt). Program Trading verschärfte den Crash. Gesamtrückgang ca. 34%.",
         "color": "rgba(255, 0, 0, 0.1)"
     },
-    # --- AKTUELLE EREIGNISSE (2025+) ---
+    #  AKTUELLE EREIGNISSE (2025+) 
     {
         "label": "Trump Zölle",
         "start": "2025-04-01",
         "end": "2025-04-30",
         "desc": "Ankündigung neuer US-Importzölle führte zu globaler Handelsunsicherheit und Volatilität an den Märkten.",
-        "color": "rgba(255, 165, 0, 0.15)"  # Orange, etwas stärker
+        "color": "rgba(255, 165, 0, 0.15)"
     }
 ]
 
-# --- FARBPALETTE FÜR PIE CHART (10 deutlich unterscheidbare Farben) ---
+#  FARBPALETTE FÜR PIE CHART (10 deutlich unterscheidbare Farben) 
 PIE_CHART_COLORS = [
     "#B3D463",  # Grün (Gutmann Accent)
     "#3498DB",  # Dunkelblau
@@ -211,7 +211,7 @@ def create_simulation_chart(
 ):
     fig = go.Figure()
 
-    # --- 1. HISTORISCHE DATEN ---
+    #  1. HISTORISCHE DATEN 
     if df_history is not None and not df_history.empty:
         fig.add_trace(
             go.Scatter(
@@ -246,7 +246,7 @@ def create_simulation_chart(
             )
         )
 
-        # --- MARKTANALYSE EVENTS (Nur für Historie relevant) ---
+        #  MARKTANALYSE EVENTS (Nur für Historie relevant) 
         if show_crisis_events:
             min_date = df_history.index.min()
             max_date = df_history.index.max()
@@ -319,10 +319,10 @@ def create_simulation_chart(
                     )
 
 
-    # --- 2. PROGNOSE-DATEN ---
+    #  2. PROGNOSE-DATEN 
     if df_forecast is not None and not df_forecast.empty:
         
-        # --- B: Median-Linie (Nominal) ---
+        #  B: Median-Linie (Nominal) 
         fig.add_trace(
             go.Scatter(
                 x=df_forecast.index,
@@ -336,7 +336,7 @@ def create_simulation_chart(
             )
         )
         
-        # --- A: Linien für Best/Worst Case (Nominal) ---
+        #  A: Linien für Best/Worst Case (Nominal) 
         fig.add_trace(
             go.Scatter(
                 x=df_forecast.index,
@@ -358,7 +358,7 @@ def create_simulation_chart(
             )
         )
         
-        # --- C: Median-Linie (Real) ---
+        #  C: Median-Linie (Real) 
         fig.add_trace(
             go.Scatter(
                 x=df_forecast.index,
@@ -372,7 +372,7 @@ def create_simulation_chart(
             )
         )
 
-        # --- D: Einzahlungen (Deterministisch) ---
+        #  D: Einzahlungen (Deterministisch) 
         fig.add_trace(
             go.Scatter(
                 x=df_forecast.index,
@@ -386,7 +386,7 @@ def create_simulation_chart(
         )
         )
 
-    # --- 3. LAYOUT ---
+    #  3. LAYOUT 
     fig.update_layout(
         title_text=title,
         title_font_color='#000000', 

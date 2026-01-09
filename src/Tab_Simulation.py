@@ -12,7 +12,7 @@ from . import plotting
 from . import portfolio_logic
 from . import prognose_logic
 from .catalog import KATALOG
-from .pdf_report import generate_pdf_report # NEU: Import für PDF
+from .pdf_report import generate_pdf_report 
 from .portfolio_templates import load_portfolio_template, get_portfolio_display_name
 from .style import (
     GUTMANN_ACCENT_GREEN,
@@ -20,7 +20,7 @@ from .style import (
     GUTMANN_SECONDARY_DARK
 )
 
-# --- KONFIGURATION & KONSTANTEN ---
+#   KONFIGURATION & KONSTANTEN  
 RISK_PROFILES = {
     "Konservativ": {"volatilitaet_pa": 10.0},
     "Ausgewogen":  {"volatilitaet_pa": 17.0},
@@ -36,18 +36,16 @@ def render():
     """
     Rendert den gesamten Inhalt des 'Simulation' Tabs.
     """
-    # --- RERUN FLAG SYSTEM ---
+    #   RERUN FLAG SYSTEM  
     # Initialisiere Flag für verzögerte Reruns (verhindert Button-Konflikte)
     if "needs_rerun" not in st.session_state:
         st.session_state.needs_rerun = False
     
-    # --- HEADER: BERATER & KUNDENDATEN (READ-ONLY) ---
+    #   HEADER: BERATER & KUNDENDATEN (READ-ONLY)  
     handover = st.session_state.get("handover_data", {})
     budget_limit = handover.get("budget", 0)
 
-    # --- BERECHNUNG & SIDE-WARNUNG (REAKTIV) ---
-    # Wir berechnen die projizierte Gesamteinzahlung manuell am Anfang, 
-    # damit die Warnung sofort und konsistent mit den KPIs ist.
+    #   BERECHNUNG & SIDE-WARNUNG (REAKTIV)
     months_sim = 0
     if st.session_state.get("sim_start_date") and st.session_state.get("sim_end_date"):
         s = st.session_state.sim_start_date
@@ -56,8 +54,8 @@ def render():
 
 
 
-    # Header-Bereich: Noch kompaktere Namen, größere Portfolio-Übersicht
-    header_col1, header_col2, header_col3 = st.columns([0.5, 0.5, 2])  # 30% schmaler!
+    # Header-Bereich:
+    header_col1, header_col2, header_col3 = st.columns([0.5, 0.5, 2])
     
     with header_col1:
         st.markdown('<div role="heading" aria-level="2" style="font-weight: bold; color: white;">BERATER</div>', unsafe_allow_html=True)
@@ -83,7 +81,7 @@ def render():
         # Header für Portfolio Bereich
         st.markdown('<div role="heading" aria-level="2" style="font-weight: bold; color: white;">PORTFOLIO-ÜBERSICHT</div>', unsafe_allow_html=True)
         
-        # --- REACTIVE CALCULATION: Werte werden nun editierbar und triggern Neuberechnung ---
+        # Werte werden editierbar und triggern Neuberechnung
         # Initialisiere editierbare Werte in Session State (falls nicht vorhanden)
         if "editable_budget" not in st.session_state:
             st.session_state.editable_budget = handover.get("budget", 0.0)
@@ -109,7 +107,6 @@ def render():
             if st.session_state.editable_einmalerlag > st.session_state.editable_budget:
                 st.session_state.editable_einmalerlag = st.session_state.editable_budget
         
-        # Premium Grid mit leerem Bereich rechts (Portfolio Übersicht kleiner)
         col_portfolio, col_empty = st.columns([0.8, 0.2])
         
         with col_portfolio:
@@ -148,18 +145,17 @@ def render():
                     on_change=recalculate_assets_from_totals,
                     help="Regelmäßiger Investitionsbetrag pro Intervall.",
                 )
-            # Portfolio Type wird nicht mehr angezeigt (ausgeblendet)
 
     # Budget Limit für spätere Verwendung (Sidebar Warnung)
     budget_limit = st.session_state.editable_budget
     
-    # --- AUTO-LOADING LOGIC (nur beim ersten Render) ---
+    #   AUTO-LOADING LOGIC (nur beim ersten Render)  
     if (handover.get("portfolio_type") and not handover.get("preloaded")):
         portfolio_type = handover["portfolio_type"]
         einmalerlag_for_loading = handover.get("einmalerlag", 0)
-        savings_rate = handover.get("savings_rate", 0)
+        savings_rate = handover.get("savings_rate", 0)  
         savings_interval = handover.get("savings_interval", "monatlich")
-        custom_weights = handover.get("custom_weights", {})  # NEU: Custom Gewichtungen aus URL
+        custom_weights = handover.get("custom_weights", {})
         
         # Portfolio-Template laden
         loaded_assets = load_portfolio_template(
@@ -169,7 +165,7 @@ def render():
             savings_interval
         )
         
-        # NEU: Custom Gewichtungen anwenden, falls vorhanden
+        # Custom Gewichtungen anwenden, falls vorhanden
         if loaded_assets and custom_weights:
             # Gewichtungen überschreiben
             for asset in loaded_assets:
@@ -196,13 +192,7 @@ def render():
     # =====================================================================
     # SECTION 1: EMPFOHLENE PRODUKTE (Main product table)
     # =====================================================================
-    
-    # st.subheader("Empfohlene Produkte")  <-- GELÖSCHT V4
-    
-    # FIX: Keine Zwischenvariablen mehr - direkt aus Session State lesen
-    # Die number_input Widgets speichern ihre Werte unter dem key im Session State
-    # Wir lesen diese Werte direkt bei der Berechnung, nicht hier
-    
+        
     # CSS to hide +/- buttons on number inputs AND center content vertically
     st.markdown("""
     <style>
@@ -330,7 +320,7 @@ def render():
             # Gewichtung über 100% → Fehlermeldung anzeigen
             st.markdown(
                 """
-                <div style="
+                <div role="alert" aria-label="Gewichtung fehlerhaft" style="
                     display: flex; 
                     align-items: center; 
                     justify-content: center; 
@@ -351,9 +341,17 @@ def render():
             )
         elif total_weight_for_pie > 0:
             # Gewichtung zwischen 0% und 100% → Pie Chart anzeigen
+            description_text = "Portfolio-Verteilung: " + ", ".join([f"{a['Name']} ({a['Gewichtung (%)']:.1f}%)" for a in st.session_state.assets if a.get("Gewichtung (%)", 0) > 0])
+            st.markdown(f'''
+                <div role="img" aria-label="Grafische Darstellung der Portfolio-Verteilung">
+                    <div style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0;">
+                        {description_text}
+                    </div>
+            ''', unsafe_allow_html=True)
             pie_fig = plotting.create_weight_pie_chart(st.session_state.assets)
             st.plotly_chart(pie_fig, use_container_width=True, key="weight_pie_chart")
-        # Bei 0% Gewichtung → nichts anzeigen (kein else-Block)
+            st.markdown('</div>', unsafe_allow_html=True)
+        # Bei 0% Gewichtung → nichts anzeigen
     
     with col_main:
         # Wrapper für das gesamte Product-Table Layout mit ARIA
@@ -475,7 +473,7 @@ def render():
         if "undo_button_shown" not in st.session_state:
             st.session_state.undo_button_shown = False
         
-        # --- UNDO BUTTON (bleibt bis zur nächsten User-Aktion) ---
+        #   UNDO BUTTON (bleibt bis zur nächsten User-Aktion)  
         if st.session_state.get("deleted_asset"):
             deleted_info = st.session_state.deleted_asset
             deleted_name = deleted_info["asset"].get("Name", "Unbekannt")
@@ -501,12 +499,11 @@ def render():
                 # Markiere dass Button jetzt sichtbar ist
                 st.session_state.undo_button_shown = True
     
-    # --- Gewichtungs-Summe anzeigen (SEHR KOMPAKT, OHNE HINTERGRUND) ---
+    #   Gewichtungs-Summe anzeigen  
     total_weight = sum(a.get("Gewichtung (%)", 0) for a in st.session_state.assets)
     
     col_sum, _ = st.columns([0.55, 0.45])
     with col_sum:
-        # Kompakte Inline-Anzeige OHNE schwarzen Hintergrund
         delta_val = total_weight - 100
         status_color = "green" if abs(delta_val) < 0.1 else "red"
         status_text = "✅ Punktlandung!" if abs(delta_val) < 0.1 else f"⚠️ {delta_val:+.1f}% vom Ziel"
@@ -520,7 +517,7 @@ def render():
             unsafe_allow_html=True
         )
     
-    # --- GEWICHTUNGS-VALIDIERUNG (Sidebar) ---
+    #   GEWICHTUNGS-VALIDIERUNG (Sidebar)  
     if abs(total_weight - 100) >= 0.1 and len(st.session_state.assets) > 0:
         with st.sidebar:
             st.warning(
@@ -530,14 +527,11 @@ def render():
                 icon="📊"
             )
 
-    # --- REACTIVE BUDGET WARNING (Sidebar) ---
     # Simulation dates for budget calculation
     start_date_sim = st.session_state.sim_start_date
     end_date_sim = st.session_state.sim_end_date
     months_sim = ((end_date_sim.year - start_date_sim.year) * 12 + (end_date_sim.month - start_date_sim.month))
     
-    # Wir berechnen die projizierte Gesamteinzahlung NACH dem Editor
-    # FIX: Lese direkt aus Session State
     proj_total_invest = 0
     for idx, a in enumerate(st.session_state.assets):
         current_w = a.get("Gewichtung (%)", 0)
@@ -566,7 +560,7 @@ def render():
     st.markdown('<div style="margin-bottom: 30px;"></div>', unsafe_allow_html=True)
 
     # =====================================================================
-    # SECTION 2: TOGGLE BUTTONS & FORMS (Below products)
+    # SECTION 2: TOGGLE BUTTONS & FORMS 
     # =====================================================================
     
     # Toggle state initialization
@@ -582,8 +576,6 @@ def render():
     def toggle_cost_settings():
         st.session_state.show_cost_settings = not st.session_state.show_cost_settings
 
-    # Beide Buttons nebeneinander (Größer & Kompakt)
-    # Ratio [1, 1, 1.5] macht die Buttons ca. 30% breiter als vorher ([0.25...])
     col_add_btn, col_cost_btn, col_spacer = st.columns([1, 1, 1.5])
     
     with col_add_btn:
@@ -621,40 +613,36 @@ def render():
             
             if is_valid and isin_to_add:
                 # Asset hinzufügen mit Gewichtung
-                # FIX Bug #5: Kein Auto-Rebalancing mehr, User-Input wird respektiert
-                # Neuer Workflow: Assets mit 0% hinzufügen, User passt in Tabelle an
                 gesamt_einmalerlag = st.session_state.editable_einmalerlag
                 gesamt_sparrate = st.session_state.editable_sparrate
                 
                 st.session_state.assets.append({
                     "Name": name_to_add,
                     "ISIN / Ticker": isin_to_add,
-                    "Gewichtung (%)": 0.0,  # GEÄNDERT: Immer 0% beim Hinzufügen
+                    "Gewichtung (%)": 0.0,  # Immer 0% beim Hinzufügen
                     "Einmalerlag (€)": 0.0,
                     "Sparbetrag (€)": 0.0,
                     "Spar-Intervall": interval,
                 })
                 
-                # ENTFERNT: Keine automatische Gleichverteilung mehr (Bug #5 Fix)
                 # User setzt Gewichtung selbst in der Tabelle
-                
                 st.toast(f"'{name_to_add}' erfolgreich hinzugefügt! Bitte Gewichtung in der Tabelle setzen.", icon="✅")
                 # Reset der Inputs
                 st.session_state.katalog_auswahl = "Bitte wählen..."
                 st.session_state.manuelle_isin = ""
 
-        # Formular - PLATZSPARENDES LAYOUT
+        # Formular
         with st.container(border=True):
             with st.form(key="add_title_form", clear_on_submit=False):
                 
-                # Zeile 1: Katalog & ISIN - Nutzt 75% der Breite [1.5, 1.5, 1]
+                # Zeile 1: Katalog & ISIN
                 col_sel1, col_sel2, _ = st.columns([1.5, 1.5, 1])
                 with col_sel1:
                     st.selectbox("Titel aus Katalog wählen", KATALOG.keys(), key="katalog_auswahl")
                 with col_sel2:
                     st.text_input("Oder ISIN / Ticker manuell eingeben", key="manuelle_isin", placeholder="z.B. US0378331005")
                 
-                # Zeile 2: Intervall + Button in einer Reihe -> Sehr kompakt (Gewichtung entfernt)
+                # Zeile 2: Intervall + Button
                 col_val1, col_val2, col_btn = st.columns([1, 1, 1])
                 with col_val1:
                     st.selectbox("Intervall", ["monatlich", "vierteljährlich", "jährlich"], key="widget_add_interval")
@@ -670,7 +658,7 @@ def render():
             st.session_state.add_error_message = None  # Reset nach Anzeige
 
 
-    # --- 2. KOSTEN SETTINGS CONTAINER (only shows when toggled) ---
+    #   2. KOSTEN SETTINGS CONTAINER (only shows when toggled)  
 
     if st.session_state.show_cost_settings:
         # Container mit Rahmen für bessere Optik
@@ -696,12 +684,12 @@ def render():
                 )
 
 
-    # --- 3. AUTOMATISCHE BERECHNUNG (HISTORIE) ---
+    #   3. AUTOMATISCHE BERECHNUNG (HISTORIE)  
     simulation_successful = False
     
     # Check if calculation is needed (Assets changed, dates changed, or results missing)
     # WICHTIG: Deep Copy der Assets, damit auch Änderungen in Dict-Werten erkannt werden!
-    # FIX: Auch editable_einmalerlag und editable_sparrate tracken für Neuberechnung
+    # Auch editable_einmalerlag und editable_sparrate tracken für Neuberechnung
     calc_relevant_state = {
         "assets": copy.deepcopy(st.session_state.assets),  # Deep Copy für Dict-Änderungen
         "start_date": st.session_state.sim_start_date,
@@ -709,8 +697,8 @@ def render():
         "ausgabe": st.session_state.cost_ausgabe,
         "mgmt": st.session_state.cost_management,
         "depot": st.session_state.cost_depot,
-        "einmalerlag": st.session_state.editable_einmalerlag,  # NEU: Trigger bei Änderung
-        "sparrate": st.session_state.editable_sparrate  # NEU: Trigger bei Änderung
+        "einmalerlag": st.session_state.editable_einmalerlag,
+        "sparrate": st.session_state.editable_sparrate
     }
     
     if "last_calc_state" not in st.session_state:
@@ -745,7 +733,7 @@ def render():
                         if name not in st.session_state.prognosis_assumptions_pa:
                             st.session_state.prognosis_assumptions_pa[name] = value
                             
-                     # --- AUTOMATISCHE PROGNOSEBERECHNUNG ---
+                     #   AUTOMATISCHE PROGNOSEBERECHNUNG  
                      start_capital_from_table = sum(
                          asset.get("Einmalerlag (€)", 0.0) 
                          for asset in st.session_state.assets 
@@ -782,8 +770,8 @@ def render():
         st.info("Bitte füge Titel zum Portfolio hinzu, um die Simulation zu starten.")
 
 
-    # --- 4. NAVIGATION TABS (Historie vs. Zukunft) ---
-    st.markdown("---")
+    #   4. NAVIGATION TABS (Historie vs. Zukunft)  
+    st.markdown(" ")
     
     if simulation_successful:
         
@@ -803,8 +791,7 @@ def render():
             help="Ansicht: Wählen Sie zwischen Historischer Simulation und Zukunftsprognose"
         )
         
-        # --- PDF REPORT LOGIK ---
-        # --- PDF REPORT LOGIK ---
+        #   PDF REPORT LOGIK  
         def show_pdf_download_button(key_suffix):
             """Zeigt PDF-Download-Button und handled den Download."""
             from .pdf_report import create_pdf_with_charts
@@ -845,7 +832,7 @@ def render():
                     st.session_state[f"pdf_data_{key_suffix}"] = pdf_bytes
                     st.session_state[f"pdf_trigger_{key_suffix}"] = True
             
-            # JS-Download-Trigger (unverändert)
+            # JS-Download-Trigger
             if st.session_state.get(f"pdf_trigger_{key_suffix}"):
                 pdf_data = st.session_state[f"pdf_data_{key_suffix}"]
                 b64_pdf = base64.b64encode(pdf_data).decode('utf-8')
@@ -940,7 +927,7 @@ def render():
                 st.metric("Endkapital (real)", f"€ {end_value_real:,.2f}", help="Kaufkraftbereinigt (basierend auf HICP Daten)")
                 st.metric("Gesamtrendite (nom.)", f"{rendite_nominal_prozent:,.2f} %", help="Prozentuale Rendite auf Basis des nominalen Endkapitals.")
                 
-                # Max Drawdown KPI (NEU)
+                # Max Drawdown KPI
                 max_dd, peak_date, trough_date = portfolio_logic.calculate_max_drawdown(st.session_state.simulations_daten)
                 if max_dd < 0 and peak_date is not None:
                     dd_range = f"{peak_date.strftime('%d.%m.%Y')} - {trough_date.strftime('%d.%m.%Y')}"
@@ -952,11 +939,11 @@ def render():
                         help="Größter Verlust vom Allzeithoch während des Simulationszeitraums."
                     )
                 
-                st.markdown("---")
+                st.markdown(" ")
                 # PDF BUTTON HISTORIE
                 show_pdf_download_button("hist")
                 
-                # CHECKOUT BUTTON (NEU)
+                # CHECKOUT BUTTON
                 from .checkout_service import render_finish_button
                 st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
                 render_finish_button("hist")
@@ -1001,7 +988,6 @@ def render():
                     sparplan_fortfuehren=FIXED_SPARPLAN_ACTIVE, 
                     kosten_management_pa_pct=st.session_state.cost_management,
                     kosten_depot_pa_eur=st.session_state.cost_depot,
-                    # inflation_rate_pa=st.session_state.inflation_slider, <-- ENTFERNT
                     ausgabeaufschlag_pct=st.session_state.cost_ausgabe,
                     expected_asset_returns_pa=current_assumptions,
                     asset_final_values=st.session_state.asset_final_values,
@@ -1009,7 +995,7 @@ def render():
                     n_simulations=FIXED_N_SIMULATIONS
                 )
 
-            # SLIDER ENTFERNT - Nur noch Jahre und Rendite Inputs
+            # Nur noch Jahre und Rendite Inputs
             var_col_yr, var_col_ret = st.columns([1, 2])
 
             with var_col_yr:
@@ -1098,12 +1084,12 @@ def render():
                     # PDF BUTTON PROGNOSE
                     show_pdf_download_button("prog")
 
-                    # CHECKOUT BUTTON (NEU)
+                    # CHECKOUT BUTTON
                     from .checkout_service import render_finish_button
                     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
                     render_finish_button("prog")
     
-    # --- CONDITIONAL RERUN AM ENDE ---
+    #   CONDITIONAL RERUN AM ENDE  
     # Wenn Input-Felder geändert wurden, triggere einen Rerun
     # Dies passiert NACH allen Button-Clicks, sodass Buttons nicht unterbrochen werden
     if st.session_state.needs_rerun:

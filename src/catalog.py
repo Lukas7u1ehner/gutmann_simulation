@@ -1,10 +1,7 @@
-# Dies ist dein zentraler Wertpapier-Katalog (nur ISINs)
-# Du kannst diese Liste jederzeit erweitern.
-
 KATALOG = {
     "Bitte wählen...": "",
     
-    # --- US Aktien (Tech & Blue Chip) ---
+    #  US Aktien (Tech & Blue Chip) 
     "Apple Aktie": "US0378331005",
     "Microsoft Aktie": "US5949181045",
     "NVIDIA Aktie": "US67066G1040",
@@ -30,7 +27,7 @@ KATALOG = {
     "Vertex Pharmaceuticals Aktie": "US92532F1003",
     "NextEra Energy Aktie": "US65339F1012",
     
-    # --- Europäische Aktien ---
+    #  Europäische Aktien 
     "ASML Aktie": "NL0010273215",
     "LVMH Aktie": "FR0000121014",
     "Novo Nordisk B Aktie": "DK0060534915",
@@ -52,7 +49,7 @@ KATALOG = {
     "Volkswagen Vz Aktie": "DE0007664039",
     "Infineon Aktie": "DE0006231004",
     
-    # --- ETFs & Fonds ---
+    #  ETFs & Fonds 
     "iShares Core MSCI World ETF": "IE00B4L5Y983",
     "Vanguard FTSE All-World ETF": "IE00BK5BQT80",
     "iShares Core S&P 500 ETF": "IE00B5BMR087",
@@ -73,7 +70,7 @@ KATALOG = {
     "Flossbach von Storch Multiple Opportunities Fonds": "LU0323578657", 
 }
 
-# --- INTERNES MAPPING: ISIN -> TICKER (für yfinance) ---
+#  INTERNES MAPPING: ISIN -> TICKER (für yfinance) 
 ISIN_TO_TICKER = {
     # US Tech & Blue Chip
     "US0378331005": "AAPL",   # Apple

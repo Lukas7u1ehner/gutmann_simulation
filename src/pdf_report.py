@@ -4,7 +4,7 @@ from datetime import datetime
 import os
 import tempfile
 
-# --- HELPER: TEXT BEREINIGUNG ---
+#  HELPER: TEXT BEREINIGUNG 
 def clean_text(text):
     """
     Ersetzt Sonderzeichen für Latin-1 Encoding (Standard in FPDF).
@@ -18,14 +18,14 @@ def clean_text(text):
     text = text.replace("%", " %")
     return text
 
-# --- KONFIGURATION ---
+#  KONFIGURATION 
 COLOR_DARK_GREEN = (37, 52, 47)      # Gutmann Dark
 COLOR_ACCENT_GREEN = (179, 212, 99)  # Gutmann Accent
 COLOR_TEXT_GREY = (80, 80, 80)
 COLOR_LIGHT_GREY = (245, 245, 245)
 LOGO_PATH = "assets/gutmann_logo-removebg-preview.png"
 
-# --- TEXTE ---
+#  TEXTE 
 DISCLAIMER_TEXT = """Für diese Aufstellung werden – soweit entsprechende Daten verfügbar sind – die Börsen- bzw. Marktpreise zum jeweiligen Stichtag als Grundlage herangezogen. Diese Stichtagskurse dienen einer einheitlichen Bewertung zum ausgewiesenen Zeitpunkt.
 
 Bei tatsächlichen Dispositionen, insbesondere bei Kauf- oder Verkaufsvorgängen, können die effektiv erzielten Kurse von den hier angeführten Stichtagswerten abweichen.
@@ -54,7 +54,7 @@ class GutmannReport(FPDF):
     def __init__(self):
         super().__init__(orientation='P', unit='mm', format='A4')
         self.set_auto_page_break(auto=True, margin=20)
-        # CRITICAL FIX: Kompression deaktivieren, damit Placeholder im Byte-Stream gefunden wird
+        # Kompression deaktivieren, damit Placeholder im Byte-Stream gefunden wird
         self.set_compression(False)
         self.alias_nb_pages() # Für Gesamtseitenzahl
 
@@ -102,14 +102,11 @@ class GutmannReport(FPDF):
 
     def create_title_page(self):
         self.add_page()
-        # Voller Hintergrund (kein weißer Balken mehr)
         self.set_fill_color(*COLOR_DARK_GREEN)
         self.rect(0, 0, 210, 297, "F")
         
         # Logo zentriert im oberen Drittel
         if os.path.exists(LOGO_PATH):
-            # Wir nehmen an, dass das Logo transparent ist oder auf dunklem Grund gut aussieht.
-            # Falls es einen weißen Rand hat, wäre ein transparentes PNG besser.
             self.image(LOGO_PATH, x=55, y=50, w=100)
         
         self.ln(130)
@@ -139,7 +136,7 @@ class GutmannReport(FPDF):
         self.add_page()
         self.section_title("1. Portfolio & Eingaben")
         
-        # --- ZENTRALISIERTES INFO-COCKPIT ---
+        #  ZENTRALISIERTES INFO-COCKPIT 
         if handover_data:
             self.set_font("Helvetica", "", 11)
             self.set_text_color(0, 0, 0)
@@ -150,7 +147,7 @@ class GutmannReport(FPDF):
             budget_v = f"{handover_data.get('budget', 0):,.2f}"
             einmal_v = f"{handover_data.get('einmalerlag', 0):,.2f}"
             spar_v   = f"{handover_data.get('savings_rate', 0):,.2f}"
-            portfolio_type = handover_data.get('portfolio_type') # FIX: Define variable
+            portfolio_type = handover_data.get('portfolio_type') 
             
             # 2-Spalten Layout: Links Personen, Rechts Zahlen
             col_w = 90
@@ -180,21 +177,18 @@ class GutmannReport(FPDF):
             print_key_val("Einmalerlag:", f"EUR {einmal_v}", start_x + col_w + 10)
             self.ln(6)
             
-            # Dritte Zeile - NUR Laufender Betrag (Portfolio Typ entfernt)
+            # Dritte Zeile
             print_key_val("Laufender Betrag (Gesamt):", f"EUR {spar_v}", start_x + col_w + 10)
             self.ln(12)
 
-        # Settings Block (Kompakter & Vertikal)
+        # Settings Block
         self.set_font("Helvetica", "B", 11)
         self.set_text_color(*COLOR_DARK_GREEN)
-        # RENAMED HEADER
         self.cell(0, 8, "Kosten", new_x="LMARGIN", new_y="NEXT")
         
         self.set_font("Helvetica", "", 10)
         self.set_text_color(0, 0, 0)
         
-        # Parameter UNTEREINANDER (Vertical List)
-        # Filtern: Prognose-Horizont raus
         for k, v in params.items():
             if "Prognose-Horizont" in k:
                 continue
@@ -219,7 +213,6 @@ class GutmannReport(FPDF):
         headers = ["Name", "ISIN", "Gew.", "Start (EUR)", "Laufend (EUR)", "Intervall"]
         
         for i, h in enumerate(headers):
-            # ZENTRIERT (außer Name)
             align = "C" if i > 0 else "L"
             self.cell(cols[i], 8, clean_text(h), border="B", fill=True, align=align)
         self.ln()
@@ -252,7 +245,7 @@ class GutmannReport(FPDF):
                 self.cell(cols[i], 8, d, border="B", align=aligns[i])
             self.ln()
         
-        # --- PIE CHART (nach Portfolio Positionen) ---
+        #  PIE CHART (nach Portfolio Positionen) 
         if pie_chart_bytes:
             self.ln(10)
             self.set_font("Helvetica", "B", 11)
@@ -280,9 +273,9 @@ class GutmannReport(FPDF):
         self.set_text_color(*COLOR_DARK_GREEN)
         self.cell(0, 8, clean_text(title), new_x="LMARGIN", new_y="NEXT")
         
-        # Einfache Tabelle - TIGHT LAYOUT (Schmäler)
-        col_name_w = 90  # War 120
-        col_val_w = 30   # War 40
+        # Einfache Tabelle
+        col_name_w = 90  
+        col_val_w = 30
         
         self.set_font("Helvetica", "B", 9)
         self.set_fill_color(*COLOR_LIGHT_GREY)
@@ -403,13 +396,12 @@ class GutmannReport(FPDF):
         self.add_page()
         self.section_title("5. Rechtliche Hinweise")
         
-        # Größere Schrift (10pt statt 9pt)
         self.set_font("Helvetica", "", 10)
         self.set_text_color(*COLOR_TEXT_GREY)
         
         paragraphs = clean_text(DISCLAIMER_TEXT).split('\n\n')
         for p in paragraphs:
-            self.multi_cell(0, 6, p) # Mehr Zeilenhöhe
+            self.multi_cell(0, 6, p) 
             self.ln(6)
 
 
@@ -453,13 +445,12 @@ def generate_pdf_report(assets, global_params, hist_fig, hist_kpis, prog_fig, pr
         date_range=date_range_prog
     )
     
-    # 4. Glossar (NEU)
+    # 4. Glossar
     pdf.create_glossary_page()
     
     # 5. Rechtliches
     pdf.create_disclaimer_page()
     
-    # --- PAGE COUNT POST-PROCESSING ---
     # Ersetze den Platzhalter {nb_true} mit der tatsächlichen Seitenanzahl minus 1 (Deckblatt)
     final_content_pages = pdf.page_no() - 1
     
@@ -479,7 +470,7 @@ def generate_pdf_report(assets, global_params, hist_fig, hist_kpis, prog_fig, pr
     return output_bytes
 
 
-# --- NEUE HELPER FUNKTIONEN (Refactoring für Tab_Simulation) ---
+# (Refactoring für Tab_Simulation) 
 
 def build_history_kpis(simulations_daten: pd.DataFrame) -> dict:
     """Erstellt KPI-Dictionary für historische Simulation."""
@@ -592,7 +583,7 @@ def create_pdf_with_charts(
             title="Zukunftsprognose"
         )
     
-    # Pie Chart für PDF erstellen (mit weißem Hintergrund für Print)
+    # Pie Chart für PDF erstellen
     pie_chart_bytes = None
     pie_fig = plotting_module.create_weight_pie_chart(assets)
     if pie_fig:
@@ -608,7 +599,6 @@ def create_pdf_with_charts(
                 showarrow=False
             )]
         )
-        # Update text color for print
         pie_fig.update_traces(textfont=dict(color="black"))
         pie_chart_bytes = pie_fig.to_image(format="png", width=800, height=500, scale=2)
     

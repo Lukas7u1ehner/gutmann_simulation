@@ -4,7 +4,6 @@ from datetime import date
 import numpy as np
 
 from . import backend_simulation
-# NEU: Import für echte Inflationsdaten
 from . import inflation
 
 def _calculate_annualized_return(sim_df: pd.DataFrame, num_years: float) -> float:
@@ -16,7 +15,7 @@ def _calculate_annualized_return(sim_df: pd.DataFrame, num_years: float) -> floa
     total_investment = sim_df['Einzahlungen (brutto)'].iloc[-1]
     
     if total_investment == 0:
-        # Fall: Nur Einmalerlag am Starttag, der nicht in 'Einzahlungen (brutto)' auftaucht
+        #Nur Einmalerlag am Starttag, der nicht in 'Einzahlungen (brutto)' auftaucht
         if end_value > 0:
             first_day_investment = sim_df['Portfolio (nominal)'].iloc[0]
             if first_day_investment > 0:
@@ -37,7 +36,6 @@ def run_portfolio_simulation(
     assets: list[dict],
     start_date: date,
     end_date: date,
-    # inflation_rate_pa entfernt -> wir nutzen jetzt echte Historie!
     ausgabeaufschlag_pct: float,
     managementgebuehr_pa_pct: float,
     depotgebuehr_pa_eur: float,
@@ -49,7 +47,6 @@ def run_portfolio_simulation(
     
     num_years = (end_date - start_date).days / 365.25
 
-    # --- NEU: ECHTE INFLATIONSDATEN VORBEREITEN ---
     full_date_range = pd.date_range(start=start_date, end=end_date, freq="D")
     historical_inflation_series = inflation.calculate_inflation_series(full_date_range)
 
@@ -76,7 +73,7 @@ def run_portfolio_simulation(
             periodic_investment=periodic,
             lump_sum=lump_sum,
             interval=interval,
-            inflation_input=historical_inflation_series, # Hier übergeben wir die Serie!
+            inflation_input=historical_inflation_series,
             ausgabeaufschlag_pct=ausgabeaufschlag_pct,
             managementgebuehr_pa_pct=managementgebuehr_pa_pct,
         )
@@ -95,16 +92,11 @@ def run_portfolio_simulation(
     if not individual_simulations:
         return None, {}, {}
 
-    # FIX: Synchronisiere alle Simulationen auf den vollen Zeitraum
     # Verhindert, dass Assets am Ende "aussteigen" und die Summe droppt.
     aligned_simulations = []
     full_index = pd.date_range(start=start_date, end=end_date, freq="D")
     
     for df in individual_simulations:
-        # 1. Reindex auf vollen Zeitraum
-        # 2. ffill() -> Werte fortschreiben (wichtig für Delistings oder Datenlücken am Ende)
-        # 3. bfill(limit=10) -> Kleine Lücken am Anfang (Feiertage, Wochenende) schließen
-        # 4. fillna(0) -> Vor dem Startdatum (wenn länger als Limit) ist alles 0
         df_aligned = df.reindex(full_index).ffill().bfill(limit=10).fillna(0.0)
         aligned_simulations.append(df_aligned)
 
@@ -112,12 +104,10 @@ def run_portfolio_simulation(
          return None, {}, {}
 
     # Summiere die angeglichenen DataFrames
-    # Da alle denselben Index haben, können wir einfach sum() auf die Liste anwenden (oder concat + groupby)
-    # pd.concat + groupby(level=0).sum() ist robust
     portfolio_df = pd.concat(aligned_simulations)
     final_portfolio = portfolio_df.groupby(portfolio_df.index).sum()
 
-    # Depotgebühren Logik (Nachträglich auf Gesamtportfolio)
+    # Depotgebühren Logik
     if depotgebuehr_pa_eur > 0:
         final_portfolio["Depotgebuehr_Pkt"] = 0.0
         yearly_fee_dates = final_portfolio.resample("YS").first().index
@@ -134,7 +124,6 @@ def run_portfolio_simulation(
         final_portfolio = final_portfolio.drop(columns=["Depotgebuehr_Pkt", "Kumulierte_Depotgebuehr"])
 
     # Realwert Berechnung (Konsistent mit Inflation auf Gesamtportfolio)
-    # Reindexieren der Inflation auf das finale Portfolio
     final_inflation_series = historical_inflation_series.reindex(final_portfolio.index, method='ffill').fillna(1.0)
     
     final_portfolio["Portfolio (real)"] = final_portfolio["Portfolio (nominal)"] / final_inflation_series

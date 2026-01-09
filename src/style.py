@@ -25,11 +25,11 @@ GUTMANN_SECONDARY_DARK = "#3E524D"
 
 def apply_gutmann_style():
     # Wir injizieren CSS, das die globalen Variablen (:root) überschreibt.
-    # Damit wird der Light-Mode des Browsers effektiv "deaktiviert" für unsere App.
-    st.markdown(f"""
+
+    st.markdown(f""" 
     <style>
     
-    /* --- 1. GLOBALEN THEME-OVERRIDE (Light Mode Killer) --- */
+    /*  1. GLOBALEN THEME-OVERRIDE (Light Mode Killer)  */
     :root {{
         --primary-color: {GUTMANN_ACCENT_GREEN};
         --background-color: {GUTMANN_DARK_GREEN};
@@ -52,7 +52,7 @@ def apply_gutmann_style():
         display: none;
     }}
     
-    /* --- 2. RADIO BUTTONS (STANDARD: TABS für Navigation) --- */
+    /*  2. RADIO BUTTONS (STANDARD: TABS für Navigation)  */
     /* Dies stellt das ursprüngliche Tab-Design für die Hauptnavigation sicher */
     
     div[data-testid="stRadio"] > div[role="radiogroup"] {{
@@ -124,7 +124,7 @@ def apply_gutmann_style():
     }}
 
 
-    /* --- 3. SPEZIAL: MARKTPHASEN CONTROL (Segmented Control) --- */
+    /*  3. SPEZIAL: MARKTPHASEN CONTROL (Segmented Control)  */
     /* Überschreibt den Style NUR für das Radio mit Label "Marktphasen anzeigen" */
     
     div[role="radiogroup"][aria-label="Marktphasen anzeigen"] {{
@@ -175,7 +175,7 @@ def apply_gutmann_style():
     }}
 
 
-    /* --- 4. TEXT HEADERS --- */
+    /*  4. TEXT HEADERS  */
     h1, h2, h3, h4, h5, h6 {{
         color: {GUTMANN_LIGHT_TEXT} !important;
     }}
@@ -188,7 +188,7 @@ def apply_gutmann_style():
         color: {GUTMANN_LIGHT_TEXT} !important;
     }}
 
-    /* --- 5. BUTTONS (Startseite & Simulation) --- */
+    /*  5. BUTTONS (Startseite & Simulation)  */
     .stButton > button {{
         background-color: {GUTMANN_ACCENT_GREEN} !important;
         color: {GUTMANN_DARK_GREEN} !important;
@@ -219,8 +219,8 @@ def apply_gutmann_style():
         box-shadow: none;
     }}
 
-    /* --- 6. SEKUNDÄRE BUTTONS (Kosten Einstellungen) --- */
-    /* --- 6. SEKUNDÄRE BUTTONS (Kosten Einstellungen & Undo) --- */
+    /*  6. SEKUNDÄRE BUTTONS (Kosten Einstellungen)  */
+    /*  6. SEKUNDÄRE BUTTONS (Kosten Einstellungen & Undo)  */
     /* Secondary Style: Heller Hintergrund + Grüne Umrandung */
     .stButton > button[kind="secondary"],
     div[data-testid="stButton"] button[kind="secondary"],
@@ -234,7 +234,7 @@ def apply_gutmann_style():
         color: {GUTMANN_LIGHT_TEXT} !important;
     }}
 
-    /* --- 7. INPUT FELDER & DROPDOWNS --- */
+    /*  7. INPUT FELDER & DROPDOWNS  */
     .stSelectbox > div > div, 
     .stTextInput > div > div > input,
     .stNumberInput > div > input {{
@@ -265,7 +265,7 @@ def apply_gutmann_style():
         background-color: {GUTMANN_DARK_GREEN} !important;
     }}
 
-    /* --- 8. TABELLEN --- */
+    /*  8. TABELLEN  */
     div[data-testid="stDataFrame"], div[data-testid="stDataEditor"] {{
         background-color: {GUTMANN_SECONDARY_DARK} !important;
         border: 1px solid {GUTMANN_DARK_GREEN};
@@ -289,7 +289,7 @@ def apply_gutmann_style():
         background-color: {GUTMANN_DARK_GREEN} !important;
     }}
 
-    /* --- 9. SONSTIGES --- */
+    /*  9. SONSTIGES  */
     .stSlider > div > div > div[data-testid="stThumbValue"] {{
         background-color: {GUTMANN_ACCENT_GREEN} !important;
         color: {GUTMANN_DARK_GREEN} !important;
@@ -332,7 +332,7 @@ def apply_gutmann_style():
         font-size: 2.0em;
     }}
 
-    /* --- 10. FOKUS-STYLING FÜR TASTATURNAVIGATION (Accessibility) --- */
+    /*  10. FOKUS-STYLING FÜR TASTATURNAVIGATION (Accessibility)  */
     /* Sichtbarer Fokus-Ring für alle interaktiven Elemente */
     /* WEIß statt Grün für besseren Kontrast gegen das grüne UI */
     input:focus,
@@ -362,7 +362,7 @@ def apply_gutmann_style():
         box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.25) !important;
     }}
 
-    /* --- 11. MOBILE RESPONSIVE: PRODUKT-TABELLE --- */
+    /*  11. MOBILE RESPONSIVE: PRODUKT-TABELLE  */
     @media (max-width: 768px) {{
         /* Produkt-Tabelle: Spalten schmaler oder gestapelt */
         .product-table div[data-testid="stHorizontalBlock"] {{
@@ -400,7 +400,7 @@ def apply_gutmann_style():
         }}
     }}
 
-    /* --- 12. INLINE VALIDATION: ROTE UMRANDUNG BEI GEWICHTUNGSFEHLER --- */
+    /*  12. INLINE VALIDATION: ROTE UMRANDUNG BEI GEWICHTUNGSFEHLER  */
     .weight-error input {{
         border: 2px solid #ff4444 !important;
         background-color: rgba(255, 68, 68, 0.1) !important;

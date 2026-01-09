@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from datetime import timedelta, date
 
-from . import inflation  # NEU: Import der zentralen Inflations-Logik
+from . import inflation  # Import der zentralen Inflations-Logik
 
 @staticmethod
 def _calculate_total_periodic_investment(assets: list[dict], interval: str) -> float:
@@ -29,7 +29,6 @@ def run_forecast(
     sparplan_fortfuehren: bool,
     kosten_management_pa_pct: float,
     kosten_depot_pa_eur: float,
-    # inflation_rate_pa: float,  <-- ENTFERNT! Wir nutzen jetzt das Modul.
     ausgabeaufschlag_pct: float,
     expected_asset_returns_pa: dict[str, float],
     asset_final_values: dict[str, float],
@@ -40,7 +39,7 @@ def run_forecast(
     if prognose_jahre <= 0:
         return None
 
-    # --- 1. Gewichtete p.a. Rendite (Erwartungswert) berechnen ---
+    #  1. Gewichtete p.a. Rendite (Erwartungswert) berechnen 
     total_portfolio_value = sum(asset_final_values.values())
     weighted_avg_return_pa = 0.0
     
@@ -50,12 +49,12 @@ def run_forecast(
             asset_return_assumption = expected_asset_returns_pa.get(asset_name, 0.0)
             weighted_avg_return_pa += weight * asset_return_assumption
     
-    # --- 2. Tägliche stochastische Parameter ---
+    #  2. Tägliche stochastische Parameter 
     trading_days = 365.25
     daily_mu = (weighted_avg_return_pa / 100.0) / trading_days
     daily_sigma = (expected_volatility_pa / 100.0) / np.sqrt(trading_days)
 
-    # --- 3. Zeitrahmen ---
+    #  3. Zeitrahmen 
     letzter_tag_hist = start_values['letzter_tag']
     letzter_wert_nominal = start_values['nominal']
     letzter_wert_real_basis = start_values['real']
@@ -72,10 +71,9 @@ def run_forecast(
 
     prognose_df = pd.DataFrame(index=prognose_zeitraum)
 
-    # --- 4. Deterministische Faktoren ---
+    #  4. Deterministische Faktoren 
     
-    # A) INFLATION (NEU via Modul)
-    # Holt sich die Kurve (2025=4%, 2026+=2% etc.)
+    # A) INFLATION 
     inflation_series = inflation.calculate_inflation_series(prognose_zeitraum)
     
     # Anpassung an Basis (falls Simulation nahtlos fortgesetzt wird)
@@ -108,7 +106,7 @@ def run_forecast(
     depotgebuehr_tage = prognose_df.resample('YS').first().index.intersection(prognose_df.index)
     prognose_df['Einzahlungen (brutto)'] = prognose_df['Sparrate_Einzahlung'].cumsum() + letzte_einzahlung
 
-    # --- 5. Monte Carlo Simulation ---
+    #  5. Monte Carlo Simulation 
     random_returns = np.random.normal(
         loc=daily_mu, 
         scale=daily_sigma, 
@@ -133,7 +131,7 @@ def run_forecast(
         current_values = np.maximum(0, current_values)
         sim_matrix[i] = current_values
 
-    # --- 6. Aggregation ---
+    #  6. Aggregation 
     prognose_df['Portfolio (Median)'] = np.quantile(sim_matrix, 0.50, axis=1)
     prognose_df['Portfolio (BestCase)'] = np.quantile(sim_matrix, 0.95, axis=1)
     prognose_df['Portfolio (WorstCase)'] = np.quantile(sim_matrix, 0.05, axis=1)

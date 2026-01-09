@@ -37,6 +37,4 @@ def preload_all_data(start_year=2000):
 
 if __name__ == "__main__":
     # Dieser Teil ermöglicht das manuelle Starten via Terminal
-    # Da wir relative Imports nutzen, muss es als Modul gestartet werden:
-    # python -m src.cache_manager
     preload_all_data()

@@ -5,7 +5,7 @@ import streamlit as st
 import numpy as np
 import os
 
-# --- CACHE KONFIGURATION ---
+#  CACHE KONFIGURATION 
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "data", "cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
@@ -30,7 +30,6 @@ def load_data(isin: str, start_date: date, end_date: date) -> pd.DataFrame | Non
             parts = cache_file.replace(".csv", "").split("_")
             if len(parts) >= 3:
                 # Letzten 3 Teile sind: YYYY-MM-DD, YYYY-MM-DD (Start, End)
-                # Bei ISINs mit Unterstrichen müssen wir von hinten parsen
                 cached_end_str = parts[-1]
                 cached_start_str = parts[-2]
                 
@@ -54,7 +53,6 @@ def load_data(isin: str, start_date: date, end_date: date) -> pd.DataFrame | Non
                             return filtered_data[["Close"]]
                         return filtered_data
                 except ValueError:
-                    # Datum konnte nicht geparst werden, überspringe diese Datei
                     continue
         except Exception as e:
             print(f"Fehler beim Lesen des Caches {cache_file}: {e}")
@@ -74,7 +72,7 @@ def load_data(isin: str, start_date: date, end_date: date) -> pd.DataFrame | Non
             print(f"Keine Daten gefunden für Ticker: {isin}")
             return None
 
-        # --- FIX FÜR MULTI-INDEX SPALTEN ---
+        #  FIX FÜR MULTI-INDEX SPALTEN 
         if isinstance(data.columns, pd.MultiIndex):
             close_col_name = [col for col in data.columns if col[0] == "Close"][0]
             close_data = data[[close_col_name]].copy()
@@ -143,7 +141,7 @@ def run_simulation(
     periodic_investment: float,
     lump_sum: float,
     interval: str,
-    # GEÄNDERT: Akzeptiert jetzt float (Prognose) ODER Series (Historie)
+    #Akzeptiert float (Prognose) ODER Series (Historie)
     inflation_input: float | pd.Series,
     ausgabeaufschlag_pct: float,
     managementgebuehr_pa_pct: float,
@@ -154,13 +152,13 @@ def run_simulation(
                      ODER eine pd.Series (Index=Date, Value=Factor) für exakte Historie.
     """
 
-    # --- 1. KOSTENFAKTOREN ---
+    #  1. KOSTENFAKTOREN 
     cost_factor = 1.0 - (ausgabeaufschlag_pct / 100.0)
 
     # TÄGLICHER Managementgebühr-Faktor
     daily_mgmt_fee_factor = (1.0 - (managementgebuehr_pa_pct / 100.0)) ** (1 / 365.0)
 
-    # --- 2. INTERVALL-LOGIK ---
+    #  2. INTERVALL-LOGIK 
     if interval == "monatlich":
         resample_code = "MS"
     elif interval == "vierteljährlich":
@@ -170,7 +168,7 @@ def run_simulation(
     else:
         resample_code = "MS"
 
-    # --- DATEN VORBEREITUNG ---
+    #  DATEN VORBEREITUNG 
     full_date_range = pd.date_range(
         start=data.index.min(), end=data.index.max(), freq="D"
     )
@@ -219,7 +217,7 @@ def run_simulation(
             periodic_data.iloc[i, periodic_data.columns.get_loc("TotalInvestment_Periodic")] = periodic_data.iloc[i-1]["TotalInvestment_Periodic"] + gross_inv
             periodic_data.iloc[i, periodic_data.columns.get_loc("TotalShares_Periodic")] = periodic_data.iloc[i-1]["TotalShares_Periodic"] + shares_bought
 
-    # --- 5. ÜBERTRAGUNG AUF TÄGLICHE BASIS ---
+    #  5. ÜBERTRAGUNG AUF TÄGLICHE BASIS 
     daily_data_with_portfolio = data.copy()
 
     daily_data_with_portfolio = pd.merge_asof(
@@ -233,18 +231,11 @@ def run_simulation(
     daily_data_with_portfolio["TotalShares_Periodic"] = daily_data_with_portfolio["TotalShares_Periodic"].fillna(0)
     daily_data_with_portfolio["TotalInvestment_Periodic"] = daily_data_with_portfolio["TotalInvestment_Periodic"].fillna(0)
     
-    # FIX: Falls die erste Zeile durch merge_asof 0 ist (weil Start-Datum vor erstem Periodic-Datum),
-    # aber wir eigentlich bei Periodic i=0 starten wollen:
-    # Wir füllen "forward" von 0 aus, aber wichtiger ist, dass wir sicherstellen, dass wir nicht 0 haben,
-    # wenn wir eigentlich schon investiert haben.
-    # Besser: Wir sorgen dafür, dass ab dem ersten Datenpunkt korrekte Werte stehen.
-    
-    # Workaround: Fülle die 0-Werte am Anfang mit dem Wert der ersten Periode, 
-    # FALLS das Daten-Startdatum sehr nahe am Perioden-Start liegt.
-    # Hier vereinfacht: Wir nutzen ffill() für Shares/Investment, falls irgendwo NaN auftaucht (sollte nicht, aber sicher ist sicher).
+    # Fülle die 0-Werte am Anfang mit dem Wert der ersten Periode, 
+    # Nutzen ffill() für Shares/Investment, falls irgendwo NaN auftaucht
     daily_data_with_portfolio["TotalShares_Periodic"] = daily_data_with_portfolio["TotalShares_Periodic"].replace(to_replace=0, method='ffill') 
     
-    # --- 6. ADDITION DES EINMALERLAGS (LUMP SUM) ---
+    #  6. ADDITION DES EINMALERLAGS (LUMP SUM) 
     lump_sum_shares = 0.0
     if lump_sum > 0 and not data.empty:
         # Wir nehmen den Close vom ERSTEN VERFÜGBAREN TAG im DataFrame
@@ -259,12 +250,11 @@ def run_simulation(
     daily_data_with_portfolio["TotalShares"] = daily_data_with_portfolio["TotalShares_Periodic"] + lump_sum_shares
     daily_data_with_portfolio["TotalInvestment"] = daily_data_with_portfolio["TotalInvestment_Periodic"] + lump_sum
     
-    # FIX: Forward Fill für die Anteile und Investments bis zum Ende, 
-    # falls Perioden-Logik aufhört aber Daten weiterlaufen.
+    # FIX: Forward Fill für die Anteile und Investments bis zum Ende, falls Perioden-Logik aufhört aber Daten weiterlaufen.
     daily_data_with_portfolio["TotalShares"] = daily_data_with_portfolio["TotalShares"].ffill()
     daily_data_with_portfolio["TotalInvestment"] = daily_data_with_portfolio["TotalInvestment"].ffill()
     
-    # --- 7. BERECHNE FINALEN WERT & GEBÜHREN ---
+    #  7. BERECHNE FINALEN WERT & GEBÜHREN 
 
     # 7a. Nominalwert
     daily_data_with_portfolio["Portfolio (nominal)"] = daily_data_with_portfolio["TotalShares"] * daily_data_with_portfolio["Close"]

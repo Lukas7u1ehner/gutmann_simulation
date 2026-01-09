@@ -3,7 +3,6 @@ import numpy as np
 
 # Statische HICP Daten für Österreich (Jahresdurchschnitt)
 # Quelle: Eurostat / Statistik Austria
-# Wird für Historie UND Prognose genutzt.
 HISTORICAL_INFLATION_MAP = {
     2010: 1.8,
     2011: 3.3,
@@ -20,7 +19,7 @@ HISTORICAL_INFLATION_MAP = {
     2022: 10.15,
     2023: 5.60,
     2024: 2.04,
-    2025: 4.00, # Prognose für laufendes Jahr
+    2025: 4.00,
 }
 
 # Standard-Annahme für Jahre, die nicht in der Map stehen (Zukunft ab 2026)
@@ -49,7 +48,6 @@ def calculate_inflation_series(date_index: pd.DatetimeIndex) -> pd.Series:
         inf_pa = get_inflation_for_year(y)
         
         # Täglicher Faktor: (1 + rate)^(1/365)
-        # Wir rechnen konservativ mit 365 Tagen
         factor = (1.0 + (inf_pa / 100.0)) ** (1 / 365.0)
         
         # Zuweisung für alle Tage dieses Jahres im Index
@@ -59,8 +57,7 @@ def calculate_inflation_series(date_index: pd.DatetimeIndex) -> pd.Series:
     # Kumulatives Produkt ergibt den Kaufkraftverlust-Faktor über die Zeit
     cumulative_inflation = daily_factors.cumprod()
     
-    # Normierung: Der Startpunkt der übergebenen Serie ist immer die Basis (1.0)
-    # Damit zeigen wir die Inflation RELATIV zum Startzeitraum an.
+    # Normierung: Der Startpunkt der übergebenen Serie ist immer die Basis (1.0) Damit zeigen wir die Inflation RELATIV zum Startzeitraum an.
     if not cumulative_inflation.empty:
         start_val = cumulative_inflation.iloc[0]
         cumulative_inflation = cumulative_inflation / start_val
