@@ -38,10 +38,10 @@ try:
     # Parameter extrahieren (mit Fallback auf Dummy-Daten)
     advisor_name = query_params.get("advisorName", "MSc Daniela Delipetar")
     client_name = query_params.get("clientName", "Tamara Wolna")  
-    budget_str = query_params.get("budget", "0")
-    einmalerlag_str = query_params.get("einmalerlag", "0") 
+    budget_str = query_params.get("budget", "500000")
+    einmalerlag_str = query_params.get("einmalerlag", "300000") 
     portfolio_type = query_params.get("portfolioType", None)  
-    savings_rate_str = query_params.get("savings_rate", query_params.get("savingsRate", "0"))
+    savings_rate_str = query_params.get("savings_rate", query_params.get("savingsRate", "2000"))
     savings_interval = query_params.get("savingsInterval", "monatlich")
     
     # Custom Gewichtungen parsen 

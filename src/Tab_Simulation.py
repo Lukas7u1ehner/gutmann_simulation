@@ -84,11 +84,11 @@ def render():
         # Werte werden editierbar und triggern Neuberechnung
         # Initialisiere editierbare Werte in Session State (falls nicht vorhanden)
         if "editable_budget" not in st.session_state:
-            st.session_state.editable_budget = handover.get("budget", 0.0)
+            st.session_state.editable_budget = handover.get("budget", 500000.0)
         if "editable_einmalerlag" not in st.session_state:
-            st.session_state.editable_einmalerlag = handover.get("einmalerlag", 0.0)
+            st.session_state.editable_einmalerlag = handover.get("einmalerlag", 300000.0)
         if "editable_sparrate" not in st.session_state:
-            st.session_state.editable_sparrate = handover.get("savings_rate", 0.0)
+            st.session_state.editable_sparrate = handover.get("savings_rate", 2000.0)
         
         portfolio_type_display = handover.get("portfolio_type", "Manuell")
         
@@ -117,7 +117,7 @@ def render():
                 st.number_input(
                     "Budget (€)",
                     min_value=0.0,
-                    step=1000.0,
+                    step=10000.0,
                     key="editable_budget",
                     format="%.0f",
                     on_change=on_budget_change,
@@ -129,7 +129,7 @@ def render():
                 st.number_input(
                     "Einmalerlag (€)",
                     min_value=0.0,
-                    step=1000.0,
+                    step=10000.0,
                     key="editable_einmalerlag",
                     format="%.0f",
                     on_change=recalculate_assets_from_totals,
@@ -139,7 +139,7 @@ def render():
                 st.number_input(
                     "Laufender Betrag",
                     min_value=0.0,
-                    step=100.0,
+                    step=1000.0,
                     key="editable_sparrate",
                     format="%.0f",
                     on_change=recalculate_assets_from_totals,
