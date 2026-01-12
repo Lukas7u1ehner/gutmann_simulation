@@ -1,0 +1,60 @@
+flowchart TD
+    %% Styles
+    classDef ui fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef logic fill:#fff9c4,stroke:#fbc02d,stroke-width:2px;
+    classDef data fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    classDef ext fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
+    classDef actor fill:#eceff1,stroke:#455a64,stroke-width:2px;
+
+    %% Nodes
+    User((User)):::actor
+    
+    subgraph Frontend ["Frontend (Streamlit)"]
+        direction TB
+        Startseite["Startseite.py<br>(Entry Point)"]:::ui
+        subgraph Tabs ["UI Modules"]
+            TabStart["Tab_Startseite.py"]:::ui
+            TabSim["Tab_Simulation.py<br>(Main UI Logic)"]:::ui
+        end
+        Plotting["plotting.py<br>(Charts)"]:::ui
+    end
+
+    subgraph Logic ["Business Logic Layer"]
+        PortLogic["portfolio_logic.py<br>(Portfolio Manager)"]:::logic
+        SimBackend["backend_simulation.py<br>(Single Asset Calc)"]:::logic
+        ProgLogic["prognose_logic.py<br>(Monte Carlo Forecast)"]:::logic
+        PDF["pdf_report.py<br>(PDF Generation)"]:::logic
+    end
+
+    subgraph Data ["Data & Resources"]
+        Catalog["catalog.py<br>(Asset Universe)"]:::data
+        Inflation["inflation.py<br>(Inflation Data)"]:::data
+        Cache[("Local Cache<br>(/data/cache/*.csv)")]:::data
+    end
+
+    subgraph External ["External"]
+        YFinance["yfinance API<br>(Live Market Data)"]:::ext
+    end
+
+    %% Relations
+    User -- "Opens App" --> Startseite
+    
+    Startseite -- "Routes to" --> TabStart
+    Startseite -- "Routes to" --> TabSim
+    
+    TabSim -- "Reads Assets" --> Catalog
+    TabSim -- "Triggers Calc" --> PortLogic
+    TabSim -- "Triggers Forecast" --> ProgLogic
+    TabSim -- "Visualizes" --> Plotting
+    TabSim -- "Generates Report" --> PDF
+    
+    PortLogic -- "Simulates each Asset" --> SimBackend
+    PortLogic -- "Gets Inflation" --> Inflation
+    
+    SimBackend -- "Checks" --> Cache
+    SimBackend -- "Downloads missing" --> YFinance
+    
+    ProgLogic -- "Uses assumptions from" --> PortLogic
+    ProgLogic -- "Gets Inflation" --> Inflation
+    
+    PDF -- "Embeds Charts" --> Plotting
